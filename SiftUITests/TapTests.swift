@@ -10,11 +10,23 @@ final class TapTests: XCTestCase {
     }
 
     func testInstagramRowsTapWhereDrawn() throws {
+        try checkTaps(page: "1", scroll: false)
+    }
+
+    func testDocumentScrollTapsWhereDrawn() throws {
+        try checkTaps(page: "2", scroll: true)
+    }
+
+    private func checkTaps(page: String, scroll: Bool) throws {
         let app = XCUIApplication()
-        app.launchEnvironment["SIFT_TEST_PAGE"] = "1"
+        app.launchEnvironment["SIFT_TEST_PAGE"] = page
         app.launch()
         XCTAssertTrue(app.staticTexts["Row 3"].waitForExistence(timeout: 45), "test page never loaded")
         sleep(1)
+        if scroll {
+            app.webViews.firstMatch.swipeUp(velocity: .slow)
+            sleep(2)
+        }
 
         let window = app.windows.firstMatch.frame
         for fraction in [0.35, 0.55, 0.75] {
