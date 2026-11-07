@@ -78,7 +78,7 @@ enum Router {
         }
 
         guard let site = site(forHost: host) else {
-            return isAuthHost(host, for: tab) ? .allow : .openExternal(url)
+            return isAuthHost(host, for: tab) || isAuthPage(url, for: tab) ? .allow : .openExternal(url)
         }
         if site != tab {
             return .switchTab(site, url)
@@ -111,6 +111,26 @@ enum Router {
 
     static func isAuthHost(_ host: String, for tab: SiteID) -> Bool {
         authHosts[tab]?.contains(host.lowercased()) ?? false
+    }
+
+    /// Google sign-in sometimes passes through www.google.com. Only its login
+    /// paths load in the YouTube tab; search and everything else go to Safari.
+    static let googleLoginPaths = ["/accounts", "/signin", "/sorry", "/recaptcha", "/gsi"]
+
+    static func isAuthPage(_ url: URL, for tab: SiteID) -> Bool {
+        guard tab == .youtube, url.host?.lowercased() == "www.google.com" else { return false }
+        let path = url.path.lowercased()
+        return googleLoginPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
+    /// Login pages that the Connect buttons open.
+    static func loginURL(for site: SiteID) -> URL {
+        switch site {
+        case .instagram:
+            return URL(string: "https://www.instagram.com/accounts/login/?next=%2Fdirect%2Finbox%2F")!
+        case .youtube:
+            return URL(string: "https://accounts.google.com/ServiceLogin?service=youtube&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Dm%26next%3D%252Ffeed%252Fsubscriptions")!
+        }
     }
 
     /// Link-wrapping redirectors: returns the real destination.

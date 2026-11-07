@@ -53,8 +53,9 @@ Then move the .p8 file somewhere safe (not Downloads). Anyone with it can manage
 
 ## 6. First run
 
-1. Open Sift. In **Messages**, log into Instagram. In **Subscriptions**, log into YouTube with Google.
-2. Delete the native Instagram and YouTube apps, or block them (next section). If they stay, nothing stops you opening them.
+1. Open Sift. The Connect screen has a **Connect** button for Instagram and for YouTube. In each login form, tap the password box, then **Passwords** above the keyboard, to fill your saved password with Face ID.
+2. Swipe left or right anywhere to switch between Messages, Subscriptions and Settings. Settings shows whether each account is connected.
+3. Delete the native Instagram and YouTube apps, or block them (next section). If they stay, nothing stops you opening them.
 
 ## 7. Blocking the native apps
 

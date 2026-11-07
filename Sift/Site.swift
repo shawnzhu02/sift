@@ -24,10 +24,11 @@ enum Site {
     }
 
     /// Scripts injected at document start in the main frame:
-    /// the URL reporter, the site's CSS, then the site's hider script.
+    /// the URL reporter, the swipe detector, the site's CSS, then the site's hider script.
     static func userScripts(for site: SiteID) -> [WKUserScript] {
         var sources: [String] = []
         if let common = resource("common", "js") { sources.append(common) }
+        if let swipe = resource("swipe", "js") { sources.append(swipe) }
         if let css = resource(site.rawValue, "css") { sources.append(styleInjector(css)) }
         if let js = resource(site.rawValue, "js") { sources.append(js) }
         return sources.map {

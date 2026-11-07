@@ -16,6 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Swipe tests
+        run: node tests/swipe.test.mjs
+
       - name: Generate project
         run: |
           brew install xcodegen

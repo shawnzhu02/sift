@@ -2,6 +2,9 @@
    Selectors drift when YouTube ships changes. Each block says what it hides,
    so a fix is a one-line edit. */
 
+/* YouTube's whole bottom bar. Sift switches pages by swiping instead. */
+ytm-pivot-bar-renderer,
+
 /* Bottom bar: Home and Shorts tabs */
 ytm-pivot-bar-item-renderer:has(.pivot-w2w),
 ytm-pivot-bar-item-renderer:has(.pivot-shorts),
@@ -58,4 +61,9 @@ ytm-mealbar-promo-renderer,
 ytm-app-promo-renderer,
 ytm-statement-banner-renderer {
   display: none !important;
+}
+
+/* Space YouTube keeps free for its bottom bar (hidden above). */
+ytm-app {
+  padding-bottom: 0 !important;
 }

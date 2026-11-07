@@ -29,7 +29,29 @@
     return el;
   }
 
+  // Instagram's bottom bar (Home, Explore, Reels, Create, Profile). Sift
+  // switches pages by swiping, so the whole bar goes. Never the DM composer.
+  var NAV_LINKS = 'a[href="/"], a[href="/explore/"], a[href="/reels/"], a[href="/direct/inbox/"]';
+
+  function hideBottomNav() {
+    var vh = window.innerHeight;
+    document.querySelectorAll(NAV_LINKS).forEach(function (a) {
+      for (var node = a.parentElement; node && node !== document.body; node = node.parentElement) {
+        var style = getComputedStyle(node);
+        if (style.position !== 'fixed' && style.position !== 'sticky') continue;
+        var rect = node.getBoundingClientRect();
+        var atBottom = rect.bottom >= vh - 2 && rect.height < vh * 0.25;
+        if (atBottom && !node.querySelector('textarea, [contenteditable="true"], [role="textbox"]')) {
+          hide(node);
+        }
+        break;
+      }
+    });
+  }
+
   function sweep() {
+    hideBottomNav();
+
     // Profile Reels tab (also matched in CSS when it has role=tab).
     document.querySelectorAll('a[href$="/reels/"]').forEach(function (a) {
       var parts = a.getAttribute('href').split('/').filter(Boolean);

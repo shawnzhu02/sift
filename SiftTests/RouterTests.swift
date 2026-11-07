@@ -128,6 +128,19 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(ig("mailto:a@b.com"), .openExternal(u("mailto:a@b.com")))
     }
 
+    func testGoogleLoginPathsAllowedInYouTubeOnly() {
+        XCTAssertEqual(yt("https://www.google.com/accounts/SetSID?x=1"), .allow)
+        XCTAssertEqual(yt("https://www.google.com/sorry/index"), .allow)
+        XCTAssertEqual(yt("https://www.google.com/search?q=cats"), .openExternal(u("https://www.google.com/search?q=cats")))
+        XCTAssertEqual(yt("https://www.google.com/accountsevil"), .openExternal(u("https://www.google.com/accountsevil")))
+        XCTAssertEqual(ig("https://www.google.com/accounts/SetSID"), .openExternal(u("https://www.google.com/accounts/SetSID")))
+    }
+
+    func testLoginURLsAreAllowedWhereTheyOpen() {
+        XCTAssertEqual(ig(Router.loginURL(for: .instagram).absoluteString), .allow)
+        XCTAssertEqual(yt(Router.loginURL(for: .youtube).absoluteString), .allow)
+    }
+
     func testOnlyExactAuthHosts() {
         XCTAssertEqual(yt("https://evil.google.com/"), .openExternal(u("https://evil.google.com/")))
         XCTAssertEqual(ig("https://evil.facebook.com/"), .openExternal(u("https://evil.facebook.com/")))

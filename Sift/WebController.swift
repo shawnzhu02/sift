@@ -2,15 +2,39 @@ import SwiftUI
 import UIKit
 import WebKit
 
-enum AppTab: Hashable {
-    case site(SiteID)
+/// The three full-screen pages, in swipe order.
+enum Page: Int, CaseIterable, Identifiable {
+    case messages
+    case subscriptions
     case settings
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .messages: return "Messages"
+        case .subscriptions: return "Subscriptions"
+        case .settings: return "Settings"
+        }
+    }
+
+    var site: SiteID? {
+        switch self {
+        case .messages: return .instagram
+        case .subscriptions: return .youtube
+        case .settings: return nil
+        }
+    }
+
+    static func page(for site: SiteID) -> Page {
+        site == .instagram ? .messages : .subscriptions
+    }
 }
 
-/// Owns both web views (so they survive tab switches) and the selected tab.
+/// Owns both web views (so they survive page switches) and the current page.
 @MainActor
 final class WebStore: ObservableObject {
-    @Published var selected: AppTab = .site(.instagram)
+    @Published var page: Page = .messages
 
     let instagram: WebController
     let youtube: WebController
@@ -26,15 +50,27 @@ final class WebStore: ObservableObject {
         site == .instagram ? instagram : youtube
     }
 
-    /// Opens a link that came from the other tab.
+    /// Moves one page left (-1) or right (+1). No wrap-around.
+    func step(_ delta: Int) {
+        let next = page.rawValue + delta
+        guard let target = Page(rawValue: next) else { return }
+        page = target
+    }
+
+    /// Opens a link that came from the other page.
     func openShared(_ url: URL, in site: SiteID) {
-        selected = .site(site)
+        page = .page(for: site)
         controller(site).loadShared(url)
     }
 
     func open(_ url: URL, in site: SiteID) {
-        selected = .site(site)
+        page = .page(for: site)
         controller(site).load(url)
+    }
+
+    /// Opens the site's login page on its own page.
+    func connect(_ site: SiteID) {
+        open(Router.loginURL(for: site), in: site)
     }
 
     /// Clears cookies and site data for both tabs (signs out of everything).
@@ -162,6 +198,11 @@ final class WebController: NSObject, ObservableObject {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Swipe reported by swipe.js.
+    fileprivate func swipeReported(_ dir: String) {
+        store?.step(dir == "next" ? 1 : -1)
+    }
+
     /// In-page URL change reported by common.js.
     fileprivate func pageReported(_ url: URL) {
         guard url != lastAllowed else { return }
@@ -220,12 +261,15 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
     init(_ target: WebController) { self.target = target }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame,
-              let body = message.body as? [String: Any],
-              let href = body["href"] as? String,
-              let url = URL(string: href)
-        else { return }
-        Task { @MainActor in self.target?.pageReported(url) }
+        guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any] else { return }
+        switch body["type"] as? String {
+        case "swipe":
+            guard let dir = body["dir"] as? String else { return }
+            Task { @MainActor in self.target?.swipeReported(dir) }
+        default:
+            guard let href = body["href"] as? String, let url = URL(string: href) else { return }
+            Task { @MainActor in self.target?.pageReported(url) }
+        }
     }
 }
 
@@ -235,7 +279,12 @@ struct WebTab: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         controller.loadStartIfNeeded()
-        return controller.webView
+        let webView = controller.webView
+        // Run edge to edge: WebKit keeps the page inside the safe area and fills
+        // the status bar and home indicator strips with the page's own color.
+        webView.scrollView.contentInsetAdjustmentBehavior = .automatic
+        webView.underPageBackgroundColor = nil  // nil = use the page's own background color
+        return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
