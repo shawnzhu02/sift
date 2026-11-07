@@ -123,7 +123,8 @@ enum Router {
         }
         // "Open in app" links: keep them on the website.
         if host == "applink.instagram.com" {
-            return URL(string: "https://www.instagram.com" + (url.path.isEmpty ? "/" : url.path))
+            let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? ""
+            return URL(string: "https://www.instagram.com" + (path.isEmpty ? "/" : path))
         }
         if site(forHost: host) == .youtube, path == "/redirect" {
             return queryURL(url, "q")
