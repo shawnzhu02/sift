@@ -17,7 +17,7 @@ enum TestPage {
       #shell { position: fixed; inset: 0; display: flex; flex-direction: column; }
       #header { height: 60px; flex: none; display: flex; align-items: center; padding-left: 16px; background: #eee; }
       #list { height: calc(100vh - 60px); overflow-y: auto; }
-      .row { height: 64px; display: flex; align-items: center; padding-left: 16px; border-bottom: 1px solid #ddd; }
+      .row { height: 64px; display: flex; align-items: center; padding-left: 16px; color: #fff; }
     </style></head>
     <body><div id="shell"><div id="header"><span id="status">none</span></div><div id="list"></div></div>
     <script>
@@ -26,6 +26,7 @@ enum TestPage {
         var d = document.createElement('div');
         d.className = 'row';
         d.textContent = 'Row ' + i;
+        d.style.background = 'rgb(' + (i * 8) + ', 120, 60)';
         d.onclick = (function (n) { return function () { document.getElementById('status').textContent = 'clicked ' + n; }; })(i);
         list.appendChild(d);
       }

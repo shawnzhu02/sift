@@ -1,26 +1,53 @@
 import XCTest
 
 /// Instagram's inbox is a fixed full-height layout with an inner scrolling list.
-/// Taps on it must land on the row that is drawn under the finger.
+/// A tap must land on the row that is *drawn* under the finger. Each test row
+/// has its own background color (red channel = row * 8), so the screenshot
+/// tells which row is drawn at a point, independent of accessibility frames.
 final class TapTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
     }
 
-    func testInstagramRowsTapWhereDrawn() {
+    func testInstagramRowsTapWhereDrawn() throws {
         let app = XCUIApplication()
         app.launchEnvironment["SIFT_TEST_PAGE"] = "1"
         app.launch()
+        XCTAssertTrue(app.staticTexts["Row 3"].waitForExistence(timeout: 45), "test page never loaded")
+        sleep(1)
 
-        for n in [3, 8] {
-            let row = app.staticTexts["Row \(n)"]
-            XCTAssertTrue(row.waitForExistence(timeout: 45), "Row \(n) never appeared")
-            row.tap()
-            let status = app.staticTexts["clicked \(n)"]
+        let window = app.windows.firstMatch.frame
+        for fraction in [0.35, 0.55, 0.75] {
+            let point = CGPoint(x: window.width * 0.8, y: window.height * fraction)
+            let shot = XCUIScreen.main.screenshot().image
+            let drawn = try XCTUnwrap(row(at: point, in: shot), "no test row drawn at \(point)")
+
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: point.x, dy: point.y))
+                .tap()
+
+            let status = app.staticTexts["clicked \(drawn)"]
             if !status.waitForExistence(timeout: 5) {
                 let got = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'clicked'")).firstMatch
-                XCTFail("Tapped Row \(n) but the page registered: \(got.exists ? got.label : "nothing")")
+                XCTFail("Finger on drawn Row \(drawn) at y=\(Int(point.y)), page registered: \(got.exists ? got.label : "nothing")")
             }
         }
+    }
+
+    /// Reads the pixel at a point (in points) and maps its red channel to a row.
+    private func row(at point: CGPoint, in image: UIImage) -> Int? {
+        guard let cg = image.cgImage else { return nil }
+        let scale = CGFloat(cg.width) / image.size.width
+        let px = Int(point.x * scale), py = Int(point.y * scale)
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let ctx = CGContext(data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                            space: CGColorSpaceCreateDeviceRGB(),
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        ctx?.draw(cg, in: CGRect(x: -px, y: py - cg.height + 1, width: cg.width, height: cg.height))
+        let (r, g, b) = (Int(pixel[0]), Int(pixel[1]), Int(pixel[2]))
+        // Rows are rgb(n * 8, 120, 60).
+        guard abs(g - 120) <= 12, abs(b - 60) <= 12 else { return nil }
+        let n = Int((Double(r) / 8).rounded())
+        return (1...30).contains(n) ? n : nil
     }
 }
