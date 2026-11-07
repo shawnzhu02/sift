@@ -1,0 +1,22 @@
+/* Sift: Instagram (www.instagram.com mobile web) filters.
+   Instagram's class names are random, so these match links and labels.
+   Each block says what it hides, so a fix is a one-line edit. */
+
+/* Nav: Home, Explore, Reels */
+a[href="/"],
+a[href="/explore/"],
+a[href="/reels/"],
+a[href^="/reels/audio/"] {
+  display: none !important;
+}
+
+/* Profile Reels tab */
+a[href$="/reels/"][role="tab"] {
+  display: none !important;
+}
+
+/* "Get the app" prompts */
+a[href*="apps.apple.com"],
+a[href*="itunes.apple.com"] {
+  display: none !important;
+}

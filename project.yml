@@ -1,0 +1,93 @@
+name: Sift
+options:
+  bundleIdPrefix: com.shawnzhu
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+configs:
+  Debug: debug
+  Release: release
+  ShieldDebug: debug
+  ShieldRelease: release
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  Sift:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sift
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: en
+        CFBundleDisplayName: Sift
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shawnzhu.sift
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: NO
+      configs:
+        ShieldDebug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG SHIELD
+          CODE_SIGN_ENTITLEMENTS: Config/SiftShield.entitlements
+        ShieldRelease:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: SHIELD
+          CODE_SIGN_ENTITLEMENTS: Config/SiftShield.entitlements
+
+  SiftTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SiftTests
+    dependencies:
+      - target: Sift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shawnzhu.sift.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Sift:
+    build:
+      targets:
+        Sift: all
+        SiftTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SiftTests
+    archive:
+      config: Release
+  SiftShield:
+    build:
+      targets:
+        Sift: all
+    run:
+      config: ShieldDebug
+    archive:
+      config: ShieldRelease

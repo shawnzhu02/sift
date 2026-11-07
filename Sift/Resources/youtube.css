@@ -1,0 +1,55 @@
+/* Sift: YouTube (m.youtube.com) filters.
+   Selectors drift when YouTube ships changes. Each block says what it hides,
+   so a fix is a one-line edit. */
+
+/* Bottom bar: Home and Shorts tabs */
+ytm-pivot-bar-item-renderer:has(.pivot-w2w),
+ytm-pivot-bar-item-renderer:has(.pivot-shorts),
+ytm-pivot-bar-item-renderer:has(a[href="/"]),
+ytm-pivot-bar-item-renderer:has(a[href^="/shorts"]),
+
+/* Shorts shelves and Shorts tiles in Subscriptions, search and channels */
+ytm-reel-shelf-renderer,
+ytm-shorts-lockup-view-model,
+ytm-shorts-lockup-view-model-v2,
+ytm-rich-section-renderer:has(ytm-reel-shelf-renderer),
+ytm-rich-section-renderer:has(ytm-shorts-lockup-view-model),
+ytm-rich-section-renderer:has(ytm-shorts-lockup-view-model-v2),
+grid-shelf-view-model:has(ytm-shorts-lockup-view-model),
+grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2),
+ytm-item-section-renderer:has(ytm-reel-shelf-renderer),
+ytm-rich-item-renderer:has(a[href^="/shorts/"]),
+ytm-video-with-context-renderer:has(a[href^="/shorts/"]),
+ytm-compact-video-renderer:has(a[href^="/shorts/"]),
+ytm-media-item:has(a[href^="/shorts/"]),
+
+/* Channel page Shorts tab */
+yt-tab-shape:has(a[href$="/shorts"]),
+a[href$="/shorts"][role="tab"],
+
+/* Watch page: related videos, up next, autoplay, end screen */
+ytm-item-section-renderer[section-identifier="related-items"],
+ytm-item-section-renderer[data-content-type="related"],
+ytm-watch-next-secondary-results-renderer,
+ytm-single-column-watch-next-results-renderer ytm-reel-shelf-renderer,
+ytm-single-column-watch-next-results-renderer ytm-video-with-context-renderer,
+ytm-single-column-watch-next-results-renderer ytm-compact-video-renderer,
+ytm-single-column-watch-next-results-renderer ytm-media-item,
+ytm-single-column-watch-next-results-renderer ytm-continuation-item-renderer,
+ytm-autonav-bar,
+.ytm-autonav-toggle-button-container,
+.ytp-autonav-toggle-button-container,
+.ytp-ce-element,
+.ytp-endscreen-content,
+.ytp-autonav-endscreen,
+.ytp-autonav-endscreen-countdown-overlay,
+.ytm-autonav-endscreen,
+.ytp-videowall-still,
+.html5-endscreen,
+
+/* "Open app" prompts */
+ytm-mealbar-promo-renderer,
+ytm-app-promo-renderer,
+ytm-statement-banner-renderer {
+  display: none !important;
+}
