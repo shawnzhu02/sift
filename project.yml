@@ -69,18 +69,33 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.shawnzhu.sift.tests
         GENERATE_INFOPLIST_FILE: YES
 
+  SiftUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SiftUITests
+    dependencies:
+      - target: Sift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shawnzhu.sift.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Sift
+
 schemes:
   Sift:
     build:
       targets:
         Sift: all
         SiftTests: [test]
+        SiftUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - SiftTests
+        - SiftUITests
     archive:
       config: Release
   SiftShield:

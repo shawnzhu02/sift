@@ -56,6 +56,9 @@ struct RootView: View {
             .task {
                 // Give the cookie store a moment to report before deciding.
                 try? await Task.sleep(for: .milliseconds(600))
+                #if DEBUG
+                if TestPage.isActive { return }
+                #endif
                 if !accounts.allConnected && !connectDismissed { showConnect = true }
             }
             .fullScreenCover(isPresented: $showConnect) {

@@ -125,7 +125,14 @@ final class WebController: NSObject, ObservableObject {
     }
 
     func loadStartIfNeeded() {
-        if webView.url == nil { load(Router.start(for: site)) }
+        guard webView.url == nil else { return }
+        #if DEBUG
+        if site == .instagram, TestPage.isActive {
+            webView.loadHTMLString(TestPage.html, baseURL: Router.instagramInbox)
+            return
+        }
+        #endif
+        load(Router.start(for: site))
     }
 
     func load(_ url: URL) {
