@@ -58,8 +58,13 @@ enum Site {
             root.appendChild(s);
           }
           add();
-          document.addEventListener('DOMContentLoaded', add);
-          new MutationObserver(add).observe(document, { childList: true, subtree: true });
+          document.addEventListener('DOMContentLoaded', function () {
+            add();
+            // Re-add only if the page rebuilds <head>; no whole-page watching.
+            if (document.head) new MutationObserver(add).observe(document.head, { childList: true });
+          });
+          new MutationObserver(add).observe(document, { childList: true });
+          if (document.documentElement) new MutationObserver(add).observe(document.documentElement, { childList: true });
         })();
         """
     }

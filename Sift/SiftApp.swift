@@ -105,10 +105,7 @@ struct PagerView: View {
     @ViewBuilder
     private func pageView(_ page: Page) -> some View {
         if let site = page.site {
-            // Edge to edge: WebKit keeps the page's content clear of the status bar
-            // and home indicator, and paints those strips in the page's own color.
-            WebTab(controller: store.controller(site))
-                .ignoresSafeArea()
+            WebPage(controller: store.controller(site))
         } else {
             SettingsView()
                 .contentShape(Rectangle())
@@ -125,6 +122,17 @@ struct PagerView: View {
                 guard abs(dx) >= 70, abs(dx) >= 2.2 * abs(dy) else { return }
                 store.step(dx < 0 ? 1 : -1)
             }
+    }
+}
+
+/// A web page inside the safe area, with the status bar and home indicator
+/// strips painted in the page's own color so it still looks edge to edge.
+struct WebPage: View {
+    @ObservedObject var controller: WebController
+
+    var body: some View {
+        WebTab(controller: controller)
+            .background(controller.pageColor.ignoresSafeArea())
     }
 }
 

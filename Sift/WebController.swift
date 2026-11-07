@@ -93,6 +93,9 @@ final class WebController: NSObject, ObservableObject {
     let webView: WKWebView
     weak var store: WebStore?
 
+    /// The page's background color, for the status bar and home indicator strips.
+    @Published private(set) var pageColor = Color(.systemBackground)
+
     /// Last URL the router allowed in this tab.
     private var lastAllowed: URL?
     /// The next navigation came from a link shared in the other tab.
@@ -205,6 +208,11 @@ final class WebController: NSObject, ObservableObject {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Background color reported by common.js.
+    fileprivate func colorReported(_ value: String) {
+        if let color = CSSColor.color(value) { pageColor = color }
+    }
+
     /// Swipe reported by swipe.js.
     fileprivate func swipeReported(_ dir: String) {
         store?.step(dir == "next" ? 1 : -1)
@@ -270,6 +278,9 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any] else { return }
         switch body["type"] as? String {
+        case "color":
+            guard let value = body["value"] as? String else { return }
+            Task { @MainActor in self.target?.colorReported(value) }
         case "swipe":
             guard let dir = body["dir"] as? String else { return }
             Task { @MainActor in self.target?.swipeReported(dir) }
@@ -287,9 +298,10 @@ struct WebTab: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         controller.loadStartIfNeeded()
         let webView = controller.webView
-        // Run edge to edge: WebKit keeps the page inside the safe area and fills
-        // the status bar and home indicator strips with the page's own color.
-        webView.scrollView.contentInsetAdjustmentBehavior = .automatic
+        // The web view sits inside the safe area with no content insets. Insets made
+        // taps on Instagram's fixed layouts land one row below the finger. The
+        // strips above and below are painted natively in the page's color.
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.underPageBackgroundColor = nil  // nil = use the page's own background color
         return webView
     }

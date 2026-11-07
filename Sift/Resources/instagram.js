@@ -52,6 +52,10 @@
   function sweep() {
     hideBottomNav();
 
+    // DMs change constantly (typing, timestamps, new messages) and hold no
+    // recommendations, so skip the heavier scans there.
+    if (location.pathname.indexOf('/direct/') === 0) return;
+
     // Profile Reels tab (also matched in CSS when it has role=tab).
     document.querySelectorAll('a[href$="/reels/"]').forEach(function (a) {
       var parts = a.getAttribute('href').split('/').filter(Boolean);

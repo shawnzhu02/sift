@@ -44,13 +44,12 @@ struct SettingsView: View {
 
             Section("Instagram") {
                 shortcut("Instagram settings", "gearshape", "https://www.instagram.com/accounts/edit/", .instagram)
-                shortcut("Notifications", "heart", "https://www.instagram.com/notifications/", .instagram)
             }
 
             Section("YouTube") {
                 shortcut("Library", "books.vertical", "https://m.youtube.com/feed/library", .youtube)
                 shortcut("History", "clock.arrow.circlepath", "https://m.youtube.com/feed/history", .youtube)
-                shortcut("YouTube account", "person.crop.circle", "https://m.youtube.com/account", .youtube)
+                shortcut("Google account", "person.crop.circle", "https://myaccount.google.com/", .youtube)
             }
 
             Section {
