@@ -47,6 +47,19 @@
       if (title && (title.textContent || '').trim().toLowerCase() === 'shorts') hide(el);
     });
 
+    // "Watch in YouTube app" pop-up: close it (or hide it if there's no close button).
+    document.querySelectorAll('dialog, .dialog-container, ytm-mealbar-promo-renderer').forEach(function (d) {
+      var text = (d.textContent || '').toLowerCase();
+      if (text.indexOf('youtube app') === -1 && text.indexOf('open app') === -1) return;
+      var close = d.querySelector('button[aria-label="Close"], [aria-label="Close"] button, button[aria-label*="lose"]');
+      if (close && !close.__siftClicked) {
+        close.__siftClicked = true;
+        close.click();
+      } else {
+        hide(d.closest('.dialog-container') || d);
+      }
+    });
+
     if (onWatchPage()) {
       // Everything after the video's own info and comments is recommendations.
       document.querySelectorAll(

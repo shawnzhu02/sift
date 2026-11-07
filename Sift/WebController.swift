@@ -123,20 +123,32 @@ final class WebController: NSObject, ObservableObject {
     /// Acts on a non-allow decision.
     /// `inPage` is true when the page already changed its URL with the History API,
     /// so a redirect must replace the current history entry.
-    private func apply(_ decision: RouteDecision, inPage: Bool) {
+    /// `userTap` is true only for link taps. Leaving the tab (other tab or Safari)
+    /// needs one, so a page can't push you out on its own.
+    private func apply(_ decision: RouteDecision, inPage: Bool, userTap: Bool = false) {
         switch decision {
         case .allow, .block:
             break
+        case .switchTab, .openExternal:
+            guard userTap, !inPage else { return }
+            leave(decision)
         case .redirect(let target):
             if inPage, let literal = jsString(target.absoluteString) {
                 webView.evaluateJavaScript("location.replace(\(literal));", completionHandler: nil)
             } else {
                 load(target)
             }
+        }
+    }
+
+    private func leave(_ decision: RouteDecision) {
+        switch decision {
         case .switchTab(let other, let target):
             store?.openShared(target, in: other)
         case .openExternal(let target):
             UIApplication.shared.open(target)
+        default:
+            break
         }
     }
 
@@ -175,7 +187,8 @@ extension WebController: WKNavigationDelegate {
             return .allow
         }
         // Act after WebKit has cancelled this navigation.
-        DispatchQueue.main.async { self.apply(decision, inPage: false) }
+        let userTap = action.navigationType == .linkActivated
+        DispatchQueue.main.async { self.apply(decision, inPage: false, userTap: userTap) }
         return .cancel
     }
 }
@@ -190,7 +203,11 @@ extension WebController: WKUIDelegate {
     ) -> WKWebView? {
         if let url = action.request.url {
             let decision = Router.decide(url, in: site, context: context)
-            if decision == .allow { load(url) } else { apply(decision, inPage: false) }
+            if decision == .allow {
+                load(url)
+            } else {
+                apply(decision, inPage: false, userTap: action.navigationType == .linkActivated)
+            }
         }
         return nil
     }

@@ -47,6 +47,12 @@ ytm-autonav-bar,
 .ytp-videowall-still,
 .html5-endscreen,
 
+/* Ads (they're recommendations too) */
+ytm-promoted-sparkles-web-renderer,
+ytm-companion-ad-renderer,
+ad-slot-renderer,
+ytm-item-section-renderer:has(ytm-promoted-sparkles-web-renderer),
+
 /* "Open app" prompts */
 ytm-mealbar-promo-renderer,
 ytm-app-promo-renderer,

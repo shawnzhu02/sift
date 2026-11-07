@@ -60,12 +60,14 @@ enum Router {
 
         if scheme != "http" && scheme != "https" {
             switch scheme {
-            case "about", "blob", "data", "javascript":
+            case "about", "blob":
                 return .allow
-            case "instagram", "youtube", "vnd.youtube", "itms-apps", "itms-appss":
-                return .block
-            default:
+            case "mailto", "tel", "sms":
                 return .openExternal(url)
+            default:
+                // data:/javascript: pages, app schemes (instagram://, youtube://)
+                // and anything else: never load or hand off.
+                return .block
             }
         }
 
@@ -101,16 +103,14 @@ enum Router {
         return nil
     }
 
-    /// Login and account hosts each site needs inside its own tab.
+    /// Exact login and account hosts each site needs inside its own tab.
+    static let authHosts: [SiteID: Set<String>] = [
+        .instagram: ["www.facebook.com", "m.facebook.com", "auth.meta.com", "accountscenter.meta.com"],
+        .youtube: ["accounts.google.com", "consent.google.com", "myaccount.google.com", "gds.google.com"],
+    ]
+
     static func isAuthHost(_ host: String, for tab: SiteID) -> Bool {
-        let h = host.lowercased()
-        func under(_ domain: String) -> Bool { h == domain || h.hasSuffix("." + domain) }
-        switch tab {
-        case .instagram:
-            return under("facebook.com") || under("meta.com") || under("fb.com")
-        case .youtube:
-            return under("google.com")
-        }
+        authHosts[tab]?.contains(host.lowercased()) ?? false
     }
 
     /// Link-wrapping redirectors: returns the real destination.
@@ -120,6 +120,10 @@ enum Router {
 
         if host == "l.instagram.com" {
             return queryURL(url, "u")
+        }
+        // "Open in app" links: keep them on the website.
+        if host == "applink.instagram.com" {
+            return URL(string: "https://www.instagram.com" + (url.path.isEmpty ? "/" : url.path))
         }
         if site(forHost: host) == .youtube, path == "/redirect" {
             return queryURL(url, "q")

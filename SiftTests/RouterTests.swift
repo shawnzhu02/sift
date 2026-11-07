@@ -102,6 +102,12 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(ig(ext), .openExternal(u("https://example.com/a")))
     }
 
+    func testInstagramAppLinksStayOnWeb() {
+        XCTAssertEqual(ig("https://applink.instagram.com/instagram/?ig_mid=X&fall_back_to_web=false"),
+                       .redirect(u("https://www.instagram.com/instagram/")))
+        XCTAssertEqual(ig("https://applink.instagram.com/"), .redirect(u("https://www.instagram.com/")))
+    }
+
     func testYouTubeLinkInInstagramSwitchesTab() {
         XCTAssertEqual(ig("https://www.youtube.com/shorts/xyz"), .switchTab(.youtube, u("https://www.youtube.com/shorts/xyz")))
     }
@@ -116,6 +122,15 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(ig("instagram://direct-inbox"), .block)
         XCTAssertEqual(yt("youtube://watch?v=1"), .block)
         XCTAssertEqual(yt("about:blank"), .allow)
+        XCTAssertEqual(ig("data:text/html,hi"), .block)
+        XCTAssertEqual(ig("javascript:alert(1)"), .block)
+        XCTAssertEqual(ig("weird-app://x"), .block)
+        XCTAssertEqual(ig("mailto:a@b.com"), .openExternal(u("mailto:a@b.com")))
+    }
+
+    func testOnlyExactAuthHosts() {
+        XCTAssertEqual(yt("https://evil.google.com/"), .openExternal(u("https://evil.google.com/")))
+        XCTAssertEqual(ig("https://evil.facebook.com/"), .openExternal(u("https://evil.facebook.com/")))
     }
 
     // MARK: YouTube feeds are blocked
