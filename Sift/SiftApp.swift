@@ -9,6 +9,8 @@ struct SiftApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                .environmentObject(store.features)
+                .environmentObject(store.clips)
                 .environmentObject(accounts)
         }
     }
@@ -21,92 +23,92 @@ struct RootView: View {
 
     @AppStorage("connectDismissed") private var connectDismissed = false
     @State private var showConnect = false
-    @State private var showIndicator = false
-    @State private var hideIndicator: Task<Void, Never>?
 
     var body: some View {
-        PagerView()
-            .overlay(alignment: .bottom) {
-                PageIndicator(page: store.page)
-                    .opacity(showIndicator ? 1 : 0)
-                    .animation(.easeOut(duration: 0.25), value: showIndicator)
-                    .allowsHitTesting(false)
-                    .padding(.bottom, 28)
-            }
-            .overlay(alignment: .top) {
+        VStack(spacing: 0) {
+            PagerView()
+            TabBar()
+        }
+        .overlay(alignment: .top) {
+            VStack(spacing: 6) {
                 if let site = accounts.justConnected {
-                    Toast(text: "\(site == .instagram ? "Instagram" : "YouTube") connected")
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .padding(.top, 6)
-                        .allowsHitTesting(false)
+                    Toast(text: "\(site == .instagram ? "Instagram" : "YouTube") connected", symbol: "checkmark.circle.fill", tint: .green)
+                }
+                if let note = store.note {
+                    Toast(text: note, symbol: "hand.raised.fill", tint: .indigo)
                 }
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: accounts.justConnected)
-            .onChange(of: store.page) { flashIndicator() }
-            .onChange(of: accounts.justConnected) {
-                guard accounts.justConnected != nil else { return }
-                Task {
-                    try? await Task.sleep(for: .seconds(2))
-                    accounts.justConnected = nil
-                }
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .padding(.top, 6)
+            .allowsHitTesting(false)
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: accounts.justConnected)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: store.note)
+        .onChange(of: accounts.justConnected) {
+            guard accounts.justConnected != nil else { return }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                accounts.justConnected = nil
             }
-            .onChange(of: scenePhase) {
-                if scenePhase == .active { accounts.refresh() }
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active { accounts.refresh() }
+        }
+        .task {
+            // Give the cookie store a moment to report before deciding.
+            try? await Task.sleep(for: .milliseconds(600))
+            #if DEBUG
+            if TestPage.isActive { return }
+            #endif
+            if !accounts.allConnected && !connectDismissed { showConnect = true }
+        }
+        .fullScreenCover(isPresented: $showConnect) {
+            ConnectView {
+                connectDismissed = true
+                showConnect = false
             }
-            .task {
-                // Give the cookie store a moment to report before deciding.
-                try? await Task.sleep(for: .milliseconds(600))
-                #if DEBUG
-                if TestPage.isActive { return }
-                #endif
-                if !accounts.allConnected && !connectDismissed { showConnect = true }
-            }
-            .fullScreenCover(isPresented: $showConnect) {
-                ConnectView {
-                    connectDismissed = true
-                    showConnect = false
-                }
-                .environmentObject(store)
-                .environmentObject(accounts)
-            }
-    }
-
-    private func flashIndicator() {
-        showIndicator = true
-        hideIndicator?.cancel()
-        hideIndicator = Task {
-            try? await Task.sleep(for: .seconds(1.2))
-            guard !Task.isCancelled else { return }
-            showIndicator = false
+            .environmentObject(store)
+            .environmentObject(accounts)
         }
     }
 }
 
-/// The three pages side by side, sliding to the current one.
-/// Web pages run edge to edge; there is no tab bar.
+/// The visible tabs side by side, sliding to the current one. Every web
+/// view stays alive, so switching tabs never reloads a page.
 struct PagerView: View {
     @EnvironmentObject private var store: WebStore
+    @EnvironmentObject private var features: FeatureStore
 
     var body: some View {
+        let tabs = SiftTab.visible(features.features)
+        let index = CGFloat(tabs.firstIndex(of: store.tab) ?? 0)
         GeometryReader { geo in
             HStack(spacing: 0) {
-                ForEach(Page.allCases) { page in
-                    pageView(page)
+                ForEach(tabs) { tab in
+                    page(tab)
                         .frame(width: geo.size.width, height: geo.size.height)
                 }
             }
             .frame(width: geo.size.width, alignment: .leading)
-            .offset(x: -CGFloat(store.page.rawValue) * geo.size.width)
-            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: store.page)
+            .offset(x: -index * geo.size.width)
+            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: store.tab)
         }
+        .clipped()
         .background(Color(.systemBackground).ignoresSafeArea())
     }
 
     @ViewBuilder
-    private func pageView(_ page: Page) -> some View {
-        if let site = page.site {
-            WebPage(controller: store.controller(site))
-        } else {
+    private func page(_ tab: SiftTab) -> some View {
+        switch tab {
+        case .messages:
+            WebPage(controller: store.controller(.messages))
+        case .feed:
+            WebPage(controller: store.controller(.feed))
+        case .clips:
+            ClipsPage()
+        case .subscriptions:
+            WebPage(controller: store.controller(.subscriptions))
+        case .settings:
             SettingsView()
                 .contentShape(Rectangle())
                 .simultaneousGesture(swipe)
@@ -125,50 +127,29 @@ struct PagerView: View {
     }
 }
 
-/// A web page inside the safe area, with the status bar and home indicator
-/// strips painted in the page's own color so it still looks edge to edge.
+/// A web page inside the safe area, with the status bar strip painted in the
+/// page's own color so it still looks edge to edge. The tab bar sits below it.
 struct WebPage: View {
     @ObservedObject var controller: WebController
 
     var body: some View {
         WebTab(controller: controller)
-            .background(controller.pageColor.ignoresSafeArea())
-    }
-}
-
-/// Dots plus the page name, shown briefly after a switch.
-struct PageIndicator: View {
-    let page: Page
-
-    var body: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                ForEach(Page.allCases) { p in
-                    Circle()
-                        .fill(p == page ? Color.primary : Color.secondary.opacity(0.4))
-                        .frame(width: 6, height: 6)
-                }
-            }
-            Text(page.title)
-                .font(.footnote.weight(.semibold))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .background(controller.pageColor.ignoresSafeArea(edges: .top))
     }
 }
 
 struct Toast: View {
     let text: String
+    var symbol = "checkmark.circle.fill"
+    var tint: Color = .green
 
     var body: some View {
-        Label(text, systemImage: "checkmark.circle.fill")
+        Label(text, systemImage: symbol)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color.green.gradient, in: Capsule())
+            .background(tint.gradient, in: Capsule())
             .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
     }
 }

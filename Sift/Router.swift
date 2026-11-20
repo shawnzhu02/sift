@@ -35,6 +35,18 @@ struct RouteContext: Equatable {
     }
 }
 
+/// The switches and the following-only clip list a decision depends on.
+struct RoutePolicy: Equatable {
+    var features: Features
+    /// Clips from people you follow, for the tab's site.
+    var clips: ClipList
+
+    init(features: Features = .strict, clips: ClipList = ClipList()) {
+        self.features = features
+        self.clips = clips
+    }
+}
+
 /// All URL policy lives here, so it can be unit-tested without a web view.
 ///
 /// Instagram: DMs, profiles, single posts, search and settings only.
@@ -45,6 +57,16 @@ struct RouteContext: Equatable {
 enum Router {
     static let instagramInbox = URL(string: "https://www.instagram.com/direct/inbox/")!
     static let youtubeSubscriptions = URL(string: "https://m.youtube.com/feed/subscriptions")!
+    /// Instagram's home feed limited to people you follow, newest first.
+    static let instagramFollowing = URL(string: "https://www.instagram.com/?variant=following")!
+
+    static func reelURL(_ id: String) -> URL {
+        URL(string: "https://www.instagram.com/reel/\(id)/")!
+    }
+
+    static func shortURL(_ id: String) -> URL {
+        URL(string: "https://m.youtube.com/shorts/\(id)")!
+    }
 
     static func start(for site: SiteID) -> URL {
         switch site {
@@ -55,7 +77,12 @@ enum Router {
 
     // MARK: - Entry point
 
-    static func decide(_ url: URL, in tab: SiteID, context: RouteContext = RouteContext()) -> RouteDecision {
+    static func decide(
+        _ url: URL,
+        in tab: SiteID,
+        context: RouteContext = RouteContext(),
+        policy: RoutePolicy = RoutePolicy()
+    ) -> RouteDecision {
         guard let scheme = url.scheme?.lowercased() else { return .allow }
 
         if scheme != "http" && scheme != "https" {
@@ -85,8 +112,8 @@ enum Router {
         }
 
         switch tab {
-        case .instagram: return instagram(url, context)
-        case .youtube: return youtube(url, context)
+        case .instagram: return instagram(url, context, policy)
+        case .youtube: return youtube(url, context, policy)
         }
     }
 
@@ -169,47 +196,97 @@ enum Router {
         "direct", "accounts", "p", "reel", "reels", "tv", "stories", "explore",
         "about", "legal", "challenge", "emails", "web", "api", "oauth", "privacy",
         "session", "your_activity", "notifications", "settings", "account_center", "ar",
+        "create",
     ]
 
-    static func instagram(_ url: URL, _ ctx: RouteContext) -> RouteDecision {
+    static func instagram(_ url: URL, _ ctx: RouteContext, _ policy: RoutePolicy = RoutePolicy()) -> RouteDecision {
+        let f = policy.features
         let seg = segments(url)
         guard let first = seg.first?.lowercased() else {
-            return .redirect(instagramInbox)  // home feed
+            // Home. With the feed (or following-only Reels) on, only the
+            // Following view, never the recommended one.
+            guard f.igFeed || f.igReels != .off else { return .redirect(instagramInbox) }
+            return queryValue(url, "variant") == "following" ? .allow : .redirect(instagramFollowing)
         }
 
         switch first {
         case "explore":
-            // Search for people is fine. The explore grid is not.
-            if seg.count >= 2, seg[1].lowercased() == "search" { return .allow }
-            return .redirect(instagramInbox)
+            // Search for people is its own switch. The explore grid is another.
+            if seg.count >= 2, seg[1].lowercased() == "search" {
+                return f.igSearch ? .allow : .redirect(instagramInbox)
+            }
+            return f.igExplore ? .allow : .redirect(instagramInbox)
 
         case "reels":
             // `/reels/` is the endless feed. `/reels/<id>/` is one reel.
             // `/reels/audio/<id>/` lists reels for a sound.
             guard seg.count >= 2, seg[1].lowercased() != "audio" else {
-                return .redirect(instagramInbox)
+                switch f.igReels {
+                case .all: return .allow
+                case .following: return .redirect(instagramFollowing)
+                case .off: return .redirect(instagramInbox)
+                }
             }
-            return singleReel(id: seg[1], ctx)
+            return reel(id: seg[1], ctx, policy)
 
         case "reel", "tv":
             guard seg.count >= 2 else { return .redirect(instagramInbox) }
-            return singleReel(id: seg[1], ctx)
+            return reel(id: seg[1], ctx, policy)
 
         case "stories":
+            guard f.igStories else { return .redirect(instagramInbox) }
             return stories(seg, ctx)
 
+        case "create":
+            return f.igPosting ? .allow : .redirect(instagramInbox)
+
+        case "accounts":
+            if seg.count >= 2, seg[1].lowercased() == "activity" {
+                return f.igNotifications ? .allow : .redirect(instagramInbox)
+            }
+            return .allow
+
         default:
-            guard !instagramReserved.contains(first), seg.count >= 2 else { return .allow }
+            guard !instagramReserved.contains(first) else { return .allow }
+            guard seg.count >= 2 else {
+                // A profile page.
+                return f.igProfiles ? .allow : .redirect(instagramInbox)
+            }
             let second = seg[1].lowercased()
             // Newer username-prefixed links: /<user>/reel/<id>/
             if (second == "reel" || second == "reels"), seg.count >= 3 {
-                return singleReel(id: seg[2], ctx)
+                return reel(id: seg[2], ctx, policy)
             }
-            // A profile's Reels tab: back to the profile grid.
+            // A profile's Reels tab: back to the profile grid unless Reels are on.
             if second == "reels" {
-                return .redirect(URL(string: "https://www.instagram.com/\(seg[0])/")!)
+                return f.igReels == .off ? .redirect(URL(string: "https://www.instagram.com/\(seg[0])/")!) : .allow
             }
             return .allow
+        }
+    }
+
+    /// One reel, by the Reels switch.
+    private static func reel(id: String, _ ctx: RouteContext, _ policy: RoutePolicy) -> RouteDecision {
+        switch policy.features.igReels {
+        case .off:
+            return singleReel(id: id, ctx)
+        case .all:
+            return .allow
+        case .following:
+            if policy.clips.contains(id) || ctx.fromSharedLink { return .allow }
+            guard let prev = ctx.previous, let host = prev.host, site(forHost: host) == .instagram else {
+                return .allow  // opened from outside the tab
+            }
+            let p = segments(prev)
+            if p.first?.lowercased() == "direct" { return .allow }
+            if let prevReel = reelID(p) {
+                if prevReel == id { return .allow }
+                // A swipe: on to the next reel from someone you follow, or stay on the last one.
+                if let next = policy.clips.next(after: prevReel) { return .redirect(reelURL(next)) }
+                return .redirect(prev)
+            }
+            // Someone you don't follow: stay where you were.
+            return .redirect(prev)
         }
     }
 
@@ -265,7 +342,11 @@ enum Router {
         "", "explore", "trending", "what_to_watch", "storefront", "news_destination", "gaming",
     ]
 
-    static func youtube(_ url: URL, _ ctx: RouteContext) -> RouteDecision {
+    /// `/feed/<name>` pages that are your own library.
+    static let youtubeLibraryFeeds: Set<String> = ["library", "history", "playlists", "you"]
+
+    static func youtube(_ url: URL, _ ctx: RouteContext, _ policy: RoutePolicy = RoutePolicy()) -> RouteDecision {
+        let f = policy.features
         let host = url.host?.lowercased() ?? ""
         let seg = segments(url)
 
@@ -275,32 +356,76 @@ enum Router {
         }
 
         guard let first = seg.first?.lowercased() else {
-            return .redirect(youtubeSubscriptions)  // home
+            return f.ytHome ? .allow : .redirect(youtubeSubscriptions)  // home
         }
 
         switch first {
         case "shorts":
-            guard seg.count >= 2 else { return .redirect(youtubeSubscriptions) }
-            // A short someone sent you plays once, as a normal video (no swipe feed).
-            if ctx.fromSharedLink || !cameFromYouTube(ctx) {
-                return .redirect(watchURL(seg[1], time: nil))
+            guard seg.count >= 2 else {
+                return f.ytShorts == .all ? .allow : .redirect(youtubeSubscriptions)
             }
-            return .redirect(youtubeSubscriptions)
+            return short(id: seg[1], ctx, policy)
 
         case "feed":
             let name = seg.count >= 2 ? seg[1].lowercased() : ""
-            return youtubeBlockedFeeds.contains(name) ? .redirect(youtubeSubscriptions) : .allow
+            if youtubeBlockedFeeds.contains(name) { return f.ytHome ? .allow : .redirect(youtubeSubscriptions) }
+            if youtubeLibraryFeeds.contains(name) { return f.ytLibrary ? .allow : .redirect(youtubeSubscriptions) }
+            return .allow
 
         case "gaming", "explore", "trending", "hashtag":
-            return .redirect(youtubeSubscriptions)
+            return f.ytHome ? .allow : .redirect(youtubeSubscriptions)
+
+        case "results":
+            return f.ytSearch ? .allow : .redirect(youtubeSubscriptions)
 
         default:
             // Channel Shorts tab: /@name/shorts, /channel/<id>/shorts, /c/<name>/shorts
-            if seg.count >= 2, seg.last?.lowercased() == "shorts" {
+            if seg.count >= 2, seg.last?.lowercased() == "shorts", f.ytShorts == .off {
                 let kept = seg.dropLast().joined(separator: "/")
                 return .redirect(URL(string: "https://m.youtube.com/\(kept)")!)
             }
             return .allow
+        }
+    }
+
+    /// One Short, by the Shorts switch.
+    private static func short(id: String, _ ctx: RouteContext, _ policy: RoutePolicy) -> RouteDecision {
+        switch policy.features.ytShorts {
+        case .off:
+            // A short someone sent you plays once, as a normal video (no swipe feed).
+            if ctx.fromSharedLink || !cameFromYouTube(ctx) {
+                return .redirect(watchURL(id, time: nil))
+            }
+            return .redirect(youtubeSubscriptions)
+        case .all:
+            return .allow
+        case .following:
+            if policy.clips.contains(id) { return .allow }
+            guard !ctx.fromSharedLink, cameFromYouTube(ctx), let prev = ctx.previous else {
+                return .redirect(watchURL(id, time: nil))
+            }
+            let p = segments(prev)
+            if p.first?.lowercased() == "shorts", p.count >= 2 {
+                if p[1] == id { return .allow }
+                // A swipe: on to the next Short from a channel you subscribe to, or stay on the last one.
+                if let next = policy.clips.next(after: p[1]) { return .redirect(shortURL(next)) }
+                return .redirect(prev)
+            }
+            // A channel you don't subscribe to: stay where you were.
+            return .redirect(prev)
+        }
+    }
+
+    /// The clip id in a URL (a Reel or a Short), if it is one.
+    static func clipID(_ url: URL) -> String? {
+        guard let host = url.host, let site = site(forHost: host) else { return nil }
+        let seg = segments(url)
+        switch site {
+        case .instagram:
+            return reelID(seg)
+        case .youtube:
+            guard seg.first?.lowercased() == "shorts", seg.count >= 2 else { return nil }
+            return seg[1]
         }
     }
 

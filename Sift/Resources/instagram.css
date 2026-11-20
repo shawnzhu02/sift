@@ -1,21 +1,46 @@
 /* Sift: Instagram (www.instagram.com mobile web) filters.
    Instagram's class names are random, so these match links and labels.
-   Each block says what it hides, so a fix is a one-line edit. */
+   Each block says what it hides, so a fix is a one-line edit.
+   Blocks under html[data-sift~="no-..."] follow a Settings switch: they hide
+   only while that switch is off. */
 
-/* Nav: Home, Explore, Reels */
-a[href="/"],
-a[href="/explore/"],
-a[href="/reels/"],
-a[href^="/reels/audio/"] {
+/* Feed switch off: the Home link. */
+html[data-sift~="no-feed"] a[href="/"] {
   display: none !important;
 }
 
-/* Profile Reels tab */
-a[href$="/reels/"][role="tab"] {
+/* Explore switch off. */
+html[data-sift~="no-explore"] a[href="/explore/"] {
   display: none !important;
 }
 
-/* "Get the app" prompts */
+/* Reels switch off: the Reels link, sound pages and a profile's Reels tab. */
+html[data-sift~="no-reels"] a[href="/reels/"],
+html[data-sift~="no-reels"] a[href^="/reels/audio/"],
+html[data-sift~="no-reels"] a[href$="/reels/"][role="tab"] {
+  display: none !important;
+}
+
+/* Posting switch off: New post / Create buttons. */
+html[data-sift~="no-posting"] a[href^="/create/"],
+html[data-sift~="no-posting"] a:has(svg[aria-label="New post"]),
+html[data-sift~="no-posting"] [role="button"]:has(svg[aria-label="New post"]) {
+  display: none !important;
+}
+
+/* Notifications switch off: the heart / activity link. */
+html[data-sift~="no-notifications"] a[href="/accounts/activity/"],
+html[data-sift~="no-notifications"] a:has(svg[aria-label="Notifications"]) {
+  display: none !important;
+}
+
+/* Search switch off. */
+html[data-sift~="no-search"] a[href="/explore/search/"],
+html[data-sift~="no-search"] a:has(svg[aria-label="Search"]) {
+  display: none !important;
+}
+
+/* Always hidden: "Get the app" prompts. */
 a[href*="apps.apple.com"],
 a[href*="itunes.apple.com"] {
   display: none !important;

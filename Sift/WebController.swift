@@ -2,9 +2,12 @@ import SwiftUI
 import UIKit
 import WebKit
 
-/// The three full-screen pages, in swipe order.
-enum Page: Int, CaseIterable, Identifiable {
+/// The app's tabs, in tab-bar order. Feed and Clips show only when their
+/// switches are on.
+enum SiftTab: Int, CaseIterable, Identifiable {
     case messages
+    case feed
+    case clips
     case subscriptions
     case settings
 
@@ -13,59 +16,154 @@ enum Page: Int, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .messages: return "Messages"
+        case .feed: return "Feed"
+        case .clips: return "Clips"
         case .subscriptions: return "Subscriptions"
         case .settings: return "Settings"
         }
     }
 
-    var site: SiteID? {
+    var symbol: String {
         switch self {
-        case .messages: return .instagram
-        case .subscriptions: return .youtube
-        case .settings: return nil
+        case .messages: return "bubble.left.and.bubble.right.fill"
+        case .feed: return "square.grid.2x2.fill"
+        case .clips: return "play.square.stack.fill"
+        case .subscriptions: return "play.rectangle.on.rectangle.fill"
+        case .settings: return "gearshape.fill"
         }
     }
 
-    static func page(for site: SiteID) -> Page {
+    static func visible(_ f: Features) -> [SiftTab] {
+        allCases.filter { tab in
+            switch tab {
+            case .feed: return f.igFeed
+            case .clips: return f.igReels != .off || f.ytShorts != .off
+            default: return true
+            }
+        }
+    }
+
+    /// The tab a site's links open in.
+    static func home(for site: SiteID) -> SiftTab {
         site == .instagram ? .messages : .subscriptions
     }
 }
 
-/// Owns both web views (so they survive page switches) and the current page.
+/// One web view's job. Each has its own web view; they share one cookie
+/// store, so you sign in once per site.
+enum WebRole: String, CaseIterable {
+    case messages
+    case feed
+    case reels
+    case subscriptions
+    case shorts
+
+    var site: SiteID {
+        switch self {
+        case .messages, .feed, .reels: return .instagram
+        case .subscriptions, .shorts: return .youtube
+        }
+    }
+
+    static func home(for site: SiteID) -> WebRole {
+        site == .instagram ? .messages : .subscriptions
+    }
+}
+
+/// Owns every web view (so they survive tab switches), the switches, the
+/// following-only clip lists and the current tab.
 @MainActor
 final class WebStore: ObservableObject {
-    @Published var page: Page = .messages
+    @Published var tab: SiftTab = .messages
+    /// Which site the Clips tab shows.
+    @Published var clipSite: SiteID = .youtube
+    /// A short note shown over the page (for example, the end of your clips).
+    @Published var note: String?
 
-    let instagram: WebController
-    let youtube: WebController
+    let features: FeatureStore
+    let clips: ClipAllowlist
+    private(set) var controllers: [WebRole: WebController] = [:]
+    private var hideNote: Task<Void, Never>?
 
     init() {
-        instagram = WebController(site: .instagram)
-        youtube = WebController(site: .youtube)
-        instagram.store = self
-        youtube.store = self
+        let features = FeatureStore()
+        self.features = features
+        self.clips = ClipAllowlist()
+        for role in WebRole.allCases {
+            let controller = WebController(role: role, features: features.features)
+            controller.store = self
+            controllers[role] = controller
+        }
+        clipSite = Self.defaultClipSite(features.features)
+        features.onChange = { [weak self] old, new in self?.featuresChanged(from: old, to: new) }
     }
 
-    func controller(_ site: SiteID) -> WebController {
-        site == .instagram ? instagram : youtube
+    var visibleTabs: [SiftTab] { SiftTab.visible(features.features) }
+
+    func controller(_ role: WebRole) -> WebController {
+        controllers[role]!
     }
 
-    /// Moves one page left (-1) or right (+1). No wrap-around.
+    func policy(for site: SiteID) -> RoutePolicy {
+        RoutePolicy(features: features.features, clips: clips.list(site))
+    }
+
+    /// The web view the Clips tab shows now.
+    var clipRole: WebRole { clipSite == .instagram ? .reels : .shorts }
+
+    /// Where a role's page starts.
+    func start(for role: WebRole) -> URL {
+        switch role {
+        case .messages: return Router.instagramInbox
+        case .feed: return Router.instagramFollowing
+        case .subscriptions: return Router.youtubeSubscriptions
+        case .reels:
+            if features.features.igReels == .following {
+                if let first = clips.list(.instagram).ids.first { return Router.reelURL(first) }
+                return Router.instagramFollowing
+            }
+            return URL(string: "https://www.instagram.com/reels/")!
+        case .shorts:
+            if features.features.ytShorts == .following {
+                if let first = clips.list(.youtube).ids.first { return Router.shortURL(first) }
+                return Router.youtubeSubscriptions
+            }
+            return URL(string: "https://m.youtube.com/shorts")!
+        }
+    }
+
+    /// Moves one tab left (-1) or right (+1) among the visible tabs. No wrap-around.
     func step(_ delta: Int) {
-        let next = page.rawValue + delta
-        guard let target = Page(rawValue: next) else { return }
-        page = target
+        let tabs = visibleTabs
+        guard let i = tabs.firstIndex(of: tab) else { tab = .messages; return }
+        let next = i + delta
+        guard tabs.indices.contains(next) else { return }
+        tab = tabs[next]
     }
 
-    /// Opens a link that came from the other page.
+    /// Tapping the current tab again takes its page back to the start.
+    func select(_ target: SiftTab) {
+        if target == tab {
+            switch target {
+            case .messages: controller(.messages).goHome()
+            case .feed: controller(.feed).goHome()
+            case .clips: controller(clipRole).goHome()
+            case .subscriptions: controller(.subscriptions).goHome()
+            case .settings: break
+            }
+        }
+        tab = target
+    }
+
+    /// Opens a link that came from another page.
     func openShared(_ url: URL, in site: SiteID) {
-        page = .page(for: site)
-        controller(site).loadShared(url)
+        tab = .home(for: site)
+        controller(.home(for: site)).loadShared(url)
     }
 
     func open(_ url: URL, in site: SiteID) {
-        page = .page(for: site)
-        controller(site).load(url)
+        tab = .home(for: site)
+        controller(.home(for: site)).load(url)
     }
 
     /// Opens the site's login page on its own page.
@@ -73,15 +171,35 @@ final class WebStore: ObservableObject {
         open(Router.loginURL(for: site), in: site)
     }
 
-    /// Clears cookies and site data for both tabs (signs out of everything).
+    func show(note text: String) {
+        note = text
+        hideNote?.cancel()
+        hideNote = Task {
+            try? await Task.sleep(for: .seconds(2.2))
+            guard !Task.isCancelled else { return }
+            note = nil
+        }
+    }
+
+    /// Clears cookies and site data for every page (signs out of everything).
     func signOutEverywhere() {
         let store = WKWebsiteDataStore.default()
         store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {
             Task { @MainActor in
-                self.instagram.reset()
-                self.youtube.reset()
+                self.controllers.values.forEach { $0.reset() }
             }
         }
+    }
+
+    private static func defaultClipSite(_ f: Features) -> SiteID {
+        f.ytShorts == .off && f.igReels != .off ? .instagram : .youtube
+    }
+
+    private func featuresChanged(from old: Features, to new: Features) {
+        // Rebuild every page's scripts and reload the ones already open.
+        controllers.values.forEach { $0.apply(features: new) }
+        if !visibleTabs.contains(tab) { tab = .settings }
+        if new.clips(clipSite) == .off { clipSite = Self.defaultClipSite(new) }
     }
 }
 
@@ -89,7 +207,8 @@ final class WebStore: ObservableObject {
 /// goes through `Router.decide`.
 @MainActor
 final class WebController: NSObject, ObservableObject {
-    let site: SiteID
+    let role: WebRole
+    var site: SiteID { role.site }
     let webView: WKWebView
     weak var store: WebStore?
 
@@ -101,8 +220,8 @@ final class WebController: NSObject, ObservableObject {
     /// The next navigation came from a link shared in the other tab.
     private var sharedPending = false
 
-    init(site: SiteID) {
-        self.site = site
+    init(role: WebRole, features: Features) {
+        self.role = role
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
@@ -120,7 +239,7 @@ final class WebController: NSObject, ObservableObject {
         webView.uiDelegate = self
 
         content.add(WeakScriptHandler(self), name: "sift")
-        Site.userScripts(for: site).forEach(content.addUserScript)
+        Site.userScripts(for: role, features: features).forEach(content.addUserScript)
 
         let refresh = UIRefreshControl()
         refresh.addTarget(self, action: #selector(pullToRefresh(_:)), for: .valueChanged)
@@ -130,12 +249,12 @@ final class WebController: NSObject, ObservableObject {
     func loadStartIfNeeded() {
         guard webView.url == nil else { return }
         #if DEBUG
-        if site == .instagram, TestPage.isActive {
+        if role == .messages, TestPage.isActive {
             webView.loadHTMLString(TestPage.html, baseURL: Router.instagramInbox)
             return
         }
         #endif
-        load(Router.start(for: site))
+        goHome()
     }
 
     func load(_ url: URL) {
@@ -148,7 +267,17 @@ final class WebController: NSObject, ObservableObject {
     }
 
     func goHome() {
-        load(Router.start(for: site))
+        load(store?.start(for: role) ?? Router.start(for: site))
+    }
+
+    /// New switches: swap the page scripts and reload an open page.
+    func apply(features: Features) {
+        let content = webView.configuration.userContentController
+        content.removeAllUserScripts()
+        Site.userScripts(for: role, features: features).forEach(content.addUserScript)
+        guard webView.url != nil else { return }
+        lastAllowed = nil
+        goHome()
     }
 
     func reset() {
@@ -164,6 +293,23 @@ final class WebController: NSObject, ObservableObject {
 
     private var context: RouteContext {
         RouteContext(previous: lastAllowed, fromSharedLink: sharedPending)
+    }
+
+    private var policy: RoutePolicy {
+        store?.policy(for: site) ?? RoutePolicy()
+    }
+
+    /// Decides a URL, and says so when a following-only swipe hits the end.
+    private func decide(_ url: URL) -> RouteDecision {
+        let decision = Router.decide(url, in: site, context: context, policy: policy)
+        if case .redirect(let target) = decision, target == lastAllowed,
+           policy.features.clips(site) == .following,
+           let id = Router.clipID(url), let last = lastAllowed, Router.clipID(last) != nil, Router.clipID(last) != id {
+            store?.show(note: site == .instagram
+                ? "That's all from people you follow"
+                : "That's all from your subscriptions")
+        }
+        return decision
     }
 
     /// Acts on a non-allow decision.
@@ -218,10 +364,15 @@ final class WebController: NSObject, ObservableObject {
         store?.step(dir == "next" ? 1 : -1)
     }
 
+    /// Clip ids from a following-only page, reported by the site script.
+    fileprivate func clipsReported(_ ids: [String]) {
+        store?.clips.add(ids, for: site)
+    }
+
     /// In-page URL change reported by common.js.
     fileprivate func pageReported(_ url: URL) {
         guard url != lastAllowed else { return }
-        let decision = Router.decide(url, in: site, context: context)
+        let decision = decide(url)
         if decision == .allow {
             allow(url)
         } else {
@@ -237,7 +388,7 @@ extension WebController: WKNavigationDelegate {
         if let frame = action.targetFrame, !frame.isMainFrame {
             return .allow
         }
-        let decision = Router.decide(url, in: site, context: context)
+        let decision = decide(url)
         if decision == .allow {
             allow(url)
             return .allow
@@ -258,7 +409,7 @@ extension WebController: WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         if let url = action.request.url {
-            let decision = Router.decide(url, in: site, context: context)
+            let decision = decide(url)
             if decision == .allow {
                 load(url)
             } else {
@@ -284,6 +435,10 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
         case "swipe":
             guard let dir = body["dir"] as? String else { return }
             Task { @MainActor in self.target?.swipeReported(dir) }
+        case "clips":
+            guard let ids = body["ids"] as? [String] else { return }
+            let clean = ids.filter { id in id.count <= 64 && id.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" } }
+            Task { @MainActor in self.target?.clipsReported(clean) }
         default:
             guard let href = body["href"] as? String, let url = URL(string: href) else { return }
             Task { @MainActor in self.target?.pageReported(url) }

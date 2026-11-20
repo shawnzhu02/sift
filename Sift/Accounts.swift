@@ -89,7 +89,7 @@ struct ConnectView: View {
                 Tip(symbol: "key.fill",
                     text: "Tap the password box, then **Passwords** above the keyboard. Face ID fills in your saved password.")
                 Tip(symbol: "hand.draw.fill",
-                    text: "Swipe left or right anywhere to switch between **Messages**, **Subscriptions** and **Settings**.")
+                    text: "Use the tabs at the bottom (or swipe left and right) to switch pages. Turn on more, like Reels from people you follow, in **Settings**.")
                 Tip(symbol: "checkmark.shield.fill",
                     text: "You log in once. Sift remembers you.")
             }

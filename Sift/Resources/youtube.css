@@ -1,54 +1,13 @@
 /* Sift: YouTube (m.youtube.com) filters.
    Selectors drift when YouTube ships changes. Each block says what it hides,
-   so a fix is a one-line edit. */
+   so a fix is a one-line edit.
+   Blocks under html[data-sift~="no-..."] follow a Settings switch: they hide
+   only while that switch is off. */
 
-/* YouTube's whole bottom bar. Sift switches pages by swiping instead. */
+/* Always hidden. */
+
+/* YouTube's whole bottom bar. Sift has its own tab bar. */
 ytm-pivot-bar-renderer,
-
-/* Bottom bar: Home and Shorts tabs */
-ytm-pivot-bar-item-renderer:has(.pivot-w2w),
-ytm-pivot-bar-item-renderer:has(.pivot-shorts),
-ytm-pivot-bar-item-renderer:has(a[href="/"]),
-ytm-pivot-bar-item-renderer:has(a[href^="/shorts"]),
-
-/* Shorts shelves and Shorts tiles in Subscriptions, search and channels */
-ytm-reel-shelf-renderer,
-ytm-shorts-lockup-view-model,
-ytm-shorts-lockup-view-model-v2,
-ytm-rich-section-renderer:has(ytm-reel-shelf-renderer),
-ytm-rich-section-renderer:has(ytm-shorts-lockup-view-model),
-ytm-rich-section-renderer:has(ytm-shorts-lockup-view-model-v2),
-grid-shelf-view-model:has(ytm-shorts-lockup-view-model),
-grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2),
-ytm-item-section-renderer:has(ytm-reel-shelf-renderer),
-ytm-rich-item-renderer:has(a[href^="/shorts/"]),
-ytm-video-with-context-renderer:has(a[href^="/shorts/"]),
-ytm-compact-video-renderer:has(a[href^="/shorts/"]),
-ytm-media-item:has(a[href^="/shorts/"]),
-
-/* Channel page Shorts tab */
-yt-tab-shape:has(a[href$="/shorts"]),
-a[href$="/shorts"][role="tab"],
-
-/* Watch page: related videos, up next, autoplay, end screen */
-ytm-item-section-renderer[section-identifier="related-items"],
-ytm-item-section-renderer[data-content-type="related"],
-ytm-watch-next-secondary-results-renderer,
-ytm-single-column-watch-next-results-renderer ytm-reel-shelf-renderer,
-ytm-single-column-watch-next-results-renderer ytm-video-with-context-renderer,
-ytm-single-column-watch-next-results-renderer ytm-compact-video-renderer,
-ytm-single-column-watch-next-results-renderer ytm-media-item,
-ytm-single-column-watch-next-results-renderer ytm-continuation-item-renderer,
-ytm-autonav-bar,
-.ytm-autonav-toggle-button-container,
-.ytp-autonav-toggle-button-container,
-.ytp-ce-element,
-.ytp-endscreen-content,
-.ytp-autonav-endscreen,
-.ytp-autonav-endscreen-countdown-overlay,
-.ytm-autonav-endscreen,
-.ytp-videowall-still,
-.html5-endscreen,
 
 /* Ads (they're recommendations too) */
 ytm-promoted-sparkles-web-renderer,
@@ -66,4 +25,64 @@ ytm-statement-banner-renderer {
 /* Space YouTube keeps free for its bottom bar (hidden above). */
 ytm-app {
   padding-bottom: 0 !important;
+}
+
+/* Shorts switch off: Shorts shelves and tiles in Subscriptions, search and channels. */
+html[data-sift~="no-shorts"] ytm-reel-shelf-renderer,
+html[data-sift~="no-shorts"] ytm-shorts-lockup-view-model,
+html[data-sift~="no-shorts"] ytm-shorts-lockup-view-model-v2,
+html[data-sift~="no-shorts"] ytm-rich-section-renderer:has(ytm-reel-shelf-renderer),
+html[data-sift~="no-shorts"] ytm-rich-section-renderer:has(ytm-shorts-lockup-view-model),
+html[data-sift~="no-shorts"] ytm-rich-section-renderer:has(ytm-shorts-lockup-view-model-v2),
+html[data-sift~="no-shorts"] grid-shelf-view-model:has(ytm-shorts-lockup-view-model),
+html[data-sift~="no-shorts"] grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2),
+html[data-sift~="no-shorts"] ytm-item-section-renderer:has(ytm-reel-shelf-renderer),
+html[data-sift~="no-shorts"] ytm-rich-item-renderer:has(a[href^="/shorts/"]),
+html[data-sift~="no-shorts"] ytm-video-with-context-renderer:has(a[href^="/shorts/"]),
+html[data-sift~="no-shorts"] ytm-compact-video-renderer:has(a[href^="/shorts/"]),
+html[data-sift~="no-shorts"] ytm-media-item:has(a[href^="/shorts/"]),
+/* Channel page Shorts tab */
+html[data-sift~="no-shorts"] yt-tab-shape:has(a[href$="/shorts"]),
+html[data-sift~="no-shorts"] a[href$="/shorts"][role="tab"] {
+  display: none !important;
+}
+
+/* Up next switch off: related videos, up next and the end screen. */
+html[data-sift~="no-upnext"] ytm-item-section-renderer[section-identifier="related-items"],
+html[data-sift~="no-upnext"] ytm-item-section-renderer[data-content-type="related"],
+html[data-sift~="no-upnext"] ytm-watch-next-secondary-results-renderer,
+html[data-sift~="no-upnext"] ytm-single-column-watch-next-results-renderer ytm-reel-shelf-renderer,
+html[data-sift~="no-upnext"] ytm-single-column-watch-next-results-renderer ytm-video-with-context-renderer,
+html[data-sift~="no-upnext"] ytm-single-column-watch-next-results-renderer ytm-compact-video-renderer,
+html[data-sift~="no-upnext"] ytm-single-column-watch-next-results-renderer ytm-media-item,
+html[data-sift~="no-upnext"] ytm-single-column-watch-next-results-renderer ytm-continuation-item-renderer,
+html[data-sift~="no-upnext"] .ytp-ce-element,
+html[data-sift~="no-upnext"] .ytp-endscreen-content,
+html[data-sift~="no-upnext"] .ytp-videowall-still,
+html[data-sift~="no-upnext"] .html5-endscreen {
+  display: none !important;
+}
+
+/* Autoplay switch off: the autoplay toggle and countdown. */
+html[data-sift~="no-autoplay"] ytm-autonav-bar,
+html[data-sift~="no-autoplay"] .ytm-autonav-toggle-button-container,
+html[data-sift~="no-autoplay"] .ytp-autonav-toggle-button-container,
+html[data-sift~="no-autoplay"] .ytp-autonav-endscreen,
+html[data-sift~="no-autoplay"] .ytp-autonav-endscreen-countdown-overlay,
+html[data-sift~="no-autoplay"] .ytm-autonav-endscreen {
+  display: none !important;
+}
+
+/* Comments switch off. */
+html[data-sift~="no-comments"] ytm-comment-section-renderer,
+html[data-sift~="no-comments"] ytm-comments-entry-point-header-renderer,
+html[data-sift~="no-comments"] ytm-item-section-renderer[section-identifier="comment-item-section"],
+html[data-sift~="no-comments"] ytm-engagement-panel-section-list-renderer[target-id*="comment"] {
+  display: none !important;
+}
+
+/* Search switch off: the search button in the top bar. */
+html[data-sift~="no-search"] ytm-topbar-menu-button-renderer:has(button[aria-label*="Search"]),
+html[data-sift~="no-search"] button[aria-label="Search YouTube"] {
+  display: none !important;
 }
