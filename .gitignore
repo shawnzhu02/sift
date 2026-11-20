@@ -3,3 +3,4 @@ build/
 DerivedData/
 *.p8
 .DS_Store
+__pycache__/
