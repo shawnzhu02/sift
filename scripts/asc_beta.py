@@ -129,21 +129,28 @@ def friends_group(app_id):
     groups = call("GET", "/betaGroups", params={"filter[app]": app_id, "filter[name]": GROUP_NAME})["data"]
     groups = [g for g in groups if not g["attributes"].get("isInternalGroup")]
     if groups:
-        group = groups[0]
-        call("PATCH", f"/betaGroups/{group['id']}", {"data": {
-            "type": "betaGroups", "id": group["id"],
-            "attributes": {"publicLinkEnabled": True, "publicLinkLimitEnabled": True,
-                           "publicLinkLimit": LINK_LIMIT, "feedbackEnabled": True},
-        }})
-        return group["id"]
+        return groups[0]["id"]
     created = call("POST", "/betaGroups", {"data": {
         "type": "betaGroups",
-        "attributes": {"name": GROUP_NAME, "publicLinkEnabled": True, "publicLinkLimitEnabled": True,
-                       "publicLinkLimit": LINK_LIMIT, "feedbackEnabled": True},
+        "attributes": {"name": GROUP_NAME, "feedbackEnabled": True},
         "relationships": {"app": {"data": {"type": "apps", "id": app_id}}},
     }})["data"]
     print(f"Created external group '{GROUP_NAME}'.")
     return created["id"]
+
+
+def public_link(group_id):
+    """Turns on the public link. Apple can refuse until a build is approved."""
+    SESSION.headers["Authorization"] = f"Bearer {token()}"
+    r = SESSION.patch(f"{API}/betaGroups/{group_id}", timeout=60, json={"data": {
+        "type": "betaGroups", "id": group_id,
+        "attributes": {"publicLinkEnabled": True, "publicLinkLimitEnabled": True,
+                       "publicLinkLimit": LINK_LIMIT},
+    }})
+    if r.status_code != 200:
+        print(f"Public link not available yet ({r.status_code}): {r.text[:300]}")
+        return None
+    return r.json()["data"]["attributes"].get("publicLink")
 
 
 def pick_build(app_id):
@@ -197,8 +204,7 @@ def main():
     build_id = pick_build(app_id)
     set_what_to_test(build_id)
     send_build(group_id, build_id)
-    group = call("GET", f"/betaGroups/{group_id}")["data"]["attributes"]
-    link = group.get("publicLink")
+    link = public_link(group_id)
     if link:
         print(f"::notice::Friends' TestFlight link: {link}")
     else:
