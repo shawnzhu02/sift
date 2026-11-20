@@ -81,3 +81,30 @@ YouTube and Instagram change their pages. If something sneaks back in (for examp
 - No push notifications for DMs. Only the native Instagram app gets those.
 - Any self-blocker can be bypassed (delete Sift, change Screen Time). The goal is friction, not a prison.
 - GitHub's free plan gives a private repo about 200 macOS minutes a month. One build uses about 10.
+
+## Friends beta (TestFlight public link)
+
+Friends install Sift through one TestFlight link. Apple reviews the first build for outside testers (usually within a day); later builds of the same version often go through faster.
+
+**One-time setup.** Set these once from Git Bash in this folder (they stay out of the code):
+
+```
+gh variable set BETA_FEEDBACK_EMAIL --body "you@example.com"
+gh variable set BETA_CONTACT_FIRST --body "First"
+gh variable set BETA_CONTACT_LAST --body "Last"
+gh variable set BETA_CONTACT_EMAIL --body "you@example.com"
+gh secret set BETA_CONTACT_PHONE --body "+1 555 555 5555"
+```
+
+`BETA_PRIVACY_URL` is already set; it points to a secret gist made from `PRIVACY.md`. Optional: `gh variable set BETA_LINK_LIMIT --body 50` caps how many people can join through the link.
+
+Apple shows the contact details only to its reviewers, never to testers.
+
+**Each time you want friends on a new build:**
+
+1. Push to `main`. CI uploads the build. Wait until it finishes processing in App Store Connect (5-15 min).
+2. Run `gh workflow run beta.yml`, or open the repo's **Actions** tab, choose **Friends beta**, then **Run workflow**. To send a specific build, pass `-f build=12`.
+3. The run fills in the test information, adds the build to the **Friends** group and submits it to Beta App Review.
+4. Once Apple approves the build, run it once more. The run's summary prints the public link (`https://testflight.apple.com/join/...`). Text that link to friends. They install the TestFlight app, tap the link, then tap **Install**.
+
+Friends sign in with their own Instagram and Google accounts. Sift has no account of its own.
