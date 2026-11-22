@@ -108,3 +108,16 @@ Apple shows the contact details only to its reviewers, never to testers.
 4. Once Apple approves the build, run it once more. The run's summary prints the public link (`https://testflight.apple.com/join/...`). Text that link to friends. They install the TestFlight app, tap the link, then tap **Install**.
 
 Friends sign in with their own Instagram and Google accounts. Sift has no account of its own.
+
+## Over-the-air filter updates
+
+The page filters in `Sift/Resources` (the CSS and JS that hide feeds, Reels, Shorts and ads) ship without a new build:
+
+- A push to `main` that changes `Sift/Resources` runs **Filters (over the air)** (`.github/workflows/filters.yml`). It tests the scripts, builds `filters.json`, signs it, and pushes it to the public repo `shawnzhu02/sift-filters`.
+- The app downloads it at launch and when you come back to it (at most every 30 minutes). It checks the signature against the key built into `Sift/FilterUpdates.swift` and saves it. New filters apply from the next page load. Settings shows "Filters: updated ..." at the bottom.
+- If anything is wrong (no network, a bad signature, a missing file), the app uses the filters built into it.
+- Pushes that only touch `Sift/Resources`, docs or scripts no longer make a TestFlight build. Swift changes still do, and still need a new build for testers.
+
+**When new filters need new app code** (for example, a new switch flag the CSS checks for), bump `schema` in `Sift/FilterUpdates.swift` in the same push. Older builds then ignore the new bundle and keep their built-in filters until they update.
+
+Secrets: `SIFT_FILTER_SIGNING_KEY` (Ed25519 private key; its public half is `publicKeyBase64` in `FilterUpdates.swift`) and `SIFT_FILTERS_DEPLOY_KEY` (write deploy key for sift-filters). No other copy of either key exists. If one is lost or leaked, make a new key pair, put the new public key in `FilterUpdates.swift`, and ship a build.

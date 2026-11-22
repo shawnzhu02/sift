@@ -40,7 +40,10 @@ enum Site {
         }
     }
 
+    /// A filter file: the downloaded copy when there is a verified one
+    /// (see FilterUpdates), otherwise the one built into the app.
     private static func resource(_ name: String, _ ext: String) -> String? {
+        if let updated = FilterUpdates.file("\(name).\(ext)") { return updated }
         guard let url = Bundle.main.url(forResource: name, withExtension: ext) else { return nil }
         return try? String(contentsOf: url, encoding: .utf8)
     }

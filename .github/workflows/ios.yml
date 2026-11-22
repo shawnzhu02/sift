@@ -3,6 +3,14 @@ name: iOS
 on:
   push:
     branches: [main]
+    # Filter-only or docs-only pushes ship over the air (filters.yml),
+    # so they don't make a new TestFlight build.
+    paths-ignore:
+      - "Sift/Resources/**"
+      - "**.md"
+      - "scripts/**"
+      - ".github/workflows/filters.yml"
+      - ".github/workflows/beta.yml"
   workflow_dispatch:
 
 concurrency:

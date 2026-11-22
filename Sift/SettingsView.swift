@@ -86,7 +86,12 @@ struct SettingsView: View {
                     Label("Sign out of everything", systemImage: "rectangle.portrait.and.arrow.right")
                 }
             } footer: {
-                Text(versionText)
+                // Redrawn when new filters arrive (store.filtersUpdated is published).
+                VStack(spacing: 2) {
+                    Text(versionText)
+                    Text(FilterUpdates.statusText)
+                }
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
             }

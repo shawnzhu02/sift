@@ -52,8 +52,12 @@ struct RootView: View {
             }
         }
         .onChange(of: scenePhase) {
-            if scenePhase == .active { accounts.refresh() }
+            if scenePhase == .active {
+                accounts.refresh()
+                Task { await store.checkFilterUpdates() }
+            }
         }
+        .task { await store.checkFilterUpdates(force: true) }
         .task {
             // Give the cookie store a moment to report before deciding.
             try? await Task.sleep(for: .milliseconds(600))

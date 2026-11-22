@@ -1,0 +1,58 @@
+name: Filters (over the air)
+
+# Publishes the page filters (Sift/Resources) to the public sift-filters repo
+# as a signed filters.json. Installed apps pick it up on their next launch or
+# return to the app, with no new build. Swift changes still need a build
+# (the iOS workflow).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Sift/Resources/**"
+      - "Sift/FilterUpdates.swift"
+      - "scripts/build_filters.py"
+  workflow_dispatch:
+
+concurrency:
+  group: filters
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swipe tests
+        run: node tests/swipe.test.mjs
+
+      - name: Check scripts parse
+        run: for f in Sift/Resources/*.js; do node --check "$f"; done
+
+      - name: Build and sign filters.json
+        env:
+          SIFT_FILTER_SIGNING_KEY: ${{ secrets.SIFT_FILTER_SIGNING_KEY }}
+        run: |
+          pip install --quiet cryptography
+          python scripts/build_filters.py dist
+
+      - name: Publish to sift-filters
+        env:
+          DEPLOY_KEY: ${{ secrets.SIFT_FILTERS_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/sift_filters
+          chmod 600 ~/.ssh/sift_filters
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/sift_filters -o IdentitiesOnly=yes"
+          git clone --depth 1 git@github.com:shawnzhu02/sift-filters.git out
+          cp dist/filters.json dist/filters.json.sig out/
+          cd out
+          git config user.name "sift filters"
+          git config user.email "sift-filters@users.noreply.github.com"
+          git add filters.json filters.json.sig
+          if git diff --cached --quiet; then echo "No change."; exit 0; fi
+          git commit -q -m "Filters from sift ${GITHUB_SHA::7}"
+          git push -q origin HEAD:main
+          echo "::notice::Filters published. Apps get them on next launch (raw.githubusercontent.com caches up to 5 minutes)."

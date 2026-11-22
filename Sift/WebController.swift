@@ -79,6 +79,8 @@ final class WebStore: ObservableObject {
     @Published var clipSite: SiteID = .youtube
     /// A short note shown over the page (for example, the end of your clips).
     @Published var note: String?
+    /// Set when new filters arrived this session; Settings re-reads its status.
+    @Published var filtersUpdated = false
 
     let features: FeatureStore
     let clips: ClipAllowlist
@@ -195,6 +197,14 @@ final class WebStore: ObservableObject {
         f.ytShorts == .off && f.igReels != .off ? .instagram : .youtube
     }
 
+    /// Looks for new filters (see FilterUpdates). New ones apply from the
+    /// next page load, so nothing reloads under the user.
+    func checkFilterUpdates(force: Bool = false) async {
+        guard await FilterUpdates.refresh(force: force) else { return }
+        controllers.values.forEach { $0.loadScripts(features.features) }
+        filtersUpdated = true
+    }
+
     private func featuresChanged(from old: Features, to new: Features) {
         // Rebuild every page's scripts and reload the ones already open.
         controllers.values.forEach { $0.apply(features: new) }
@@ -272,12 +282,17 @@ final class WebController: NSObject, ObservableObject {
 
     /// New switches: swap the page scripts and reload an open page.
     func apply(features: Features) {
-        let content = webView.configuration.userContentController
-        content.removeAllUserScripts()
-        Site.userScripts(for: role, features: features).forEach(content.addUserScript)
+        loadScripts(features)
         guard webView.url != nil else { return }
         lastAllowed = nil
         goHome()
+    }
+
+    /// Swaps in fresh scripts without reloading; they apply on the next page load.
+    func loadScripts(_ features: Features) {
+        let content = webView.configuration.userContentController
+        content.removeAllUserScripts()
+        Site.userScripts(for: role, features: features).forEach(content.addUserScript)
     }
 
     func reset() {
