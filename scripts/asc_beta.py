@@ -196,7 +196,48 @@ def send_build(group_id, build_id):
     print("Sent to Beta App Review. Apple usually answers within a day.")
 
 
+def status():
+    """Read-only: prints where each recent build and the Friends group stand."""
+    app_id = find_app()
+    builds = call("GET", "/builds", params={"filter[app]": app_id, "sort": "-uploadedDate", "limit": 5,
+                                            "include": "buildBetaDetail,betaAppReviewSubmission,preReleaseVersion"})
+    included = {(i["type"], i["id"]): i["attributes"] for i in builds.get("included", [])}
+    print("Recent builds:")
+    for b in builds["data"]:
+        rel = b.get("relationships", {})
+        def attrs(name, kind):
+            data = (rel.get(name) or {}).get("data")
+            return included.get((kind, data["id"]), {}) if data else {}
+        detail = attrs("buildBetaDetail", "buildBetaDetails")
+        review = attrs("betaAppReviewSubmission", "betaAppReviewSubmissions")
+        version = attrs("preReleaseVersion", "preReleaseVersions").get("version", "?")
+        a = b["attributes"]
+        print(f"  {version} ({a['version']}): processing {a.get('processingState')}, "
+              f"external {detail.get('externalBuildState')}, internal {detail.get('internalBuildState')}, "
+              f"beta review {review.get('betaReviewState', 'not submitted')}, uploaded {a.get('uploadedDate')}")
+    groups = call("GET", "/betaGroups", params={"filter[app]": app_id, "filter[name]": GROUP_NAME})["data"]
+    for g in groups:
+        ga = g["attributes"]
+        gb = call("GET", f"/betaGroups/{g['id']}/builds", params={"fields[builds]": "version"})["data"]
+        testers = call("GET", f"/betaGroups/{g['id']}/betaTesters", params={"limit": 200})["data"]
+        print(f"Group {ga['name']} (internal={ga.get('isInternalGroup')}): builds {[x['attributes']['version'] for x in gb]}, "
+              f"public link {ga.get('publicLink')} enabled={ga.get('publicLinkEnabled')} limit={ga.get('publicLinkLimit')}, "
+              f"testers {len(testers)}")
+    info = call("GET", f"/apps/{app_id}/betaAppLocalizations")["data"]
+    for l in info:
+        la = l["attributes"]
+        print(f"Test info {la['locale']}: description {'set' if la.get('description') else 'MISSING'}, "
+              f"feedback email {'set' if la.get('feedbackEmail') else 'MISSING'}, privacy URL {la.get('privacyPolicyUrl')}")
+    rd = call("GET", f"/apps/{app_id}/betaAppReviewDetail")["data"]["attributes"]
+    missing = [k for k in ("contactFirstName", "contactLastName", "contactPhone", "contactEmail") if not rd.get(k)]
+    print(f"Review contact: {'complete' if not missing else 'MISSING ' + ', '.join(missing)}, "
+          f"demo account required={rd.get('demoAccountRequired')}, notes {'set' if rd.get('notes') else 'MISSING'}")
+
+
 def main():
+    if os.environ.get("STATUS_ONLY") == "true":
+        status()
+        return
     app_id = find_app()
     set_test_info(app_id)
     set_review_details(app_id)

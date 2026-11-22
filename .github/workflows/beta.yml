@@ -10,6 +10,11 @@ on:
         description: "Build number (blank = newest processed build)"
         required: false
         default: ""
+      status:
+        description: "Only report status (changes nothing)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   beta:
@@ -24,6 +29,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           BUILD_NUMBER: ${{ inputs.build }}
+          STATUS_ONLY: ${{ inputs.status }}
           BETA_PRIVACY_URL: ${{ vars.BETA_PRIVACY_URL }}
           BETA_FEEDBACK_EMAIL: ${{ vars.BETA_FEEDBACK_EMAIL }}
           BETA_CONTACT_FIRST: ${{ vars.BETA_CONTACT_FIRST }}
