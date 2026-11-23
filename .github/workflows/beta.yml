@@ -30,11 +30,11 @@ jobs:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           BUILD_NUMBER: ${{ inputs.build }}
           STATUS_ONLY: ${{ inputs.status }}
-          BETA_PRIVACY_URL: ${{ vars.BETA_PRIVACY_URL }}
-          BETA_FEEDBACK_EMAIL: ${{ vars.BETA_FEEDBACK_EMAIL }}
-          BETA_CONTACT_FIRST: ${{ vars.BETA_CONTACT_FIRST }}
-          BETA_CONTACT_LAST: ${{ vars.BETA_CONTACT_LAST }}
-          BETA_CONTACT_EMAIL: ${{ vars.BETA_CONTACT_EMAIL }}
+          BETA_PRIVACY_URL: ${{ secrets.BETA_PRIVACY_URL }}
+          BETA_FEEDBACK_EMAIL: ${{ secrets.BETA_FEEDBACK_EMAIL }}
+          BETA_CONTACT_FIRST: ${{ secrets.BETA_CONTACT_FIRST }}
+          BETA_CONTACT_LAST: ${{ secrets.BETA_CONTACT_LAST }}
+          BETA_CONTACT_EMAIL: ${{ secrets.BETA_CONTACT_EMAIL }}
           BETA_CONTACT_PHONE: ${{ secrets.BETA_CONTACT_PHONE }}
           BETA_LINK_LIMIT: ${{ vars.BETA_LINK_LIMIT }}
         run: |
