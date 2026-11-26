@@ -45,3 +45,20 @@ a[href*="apps.apple.com"],
 a[href*="itunes.apple.com"] {
   display: none !important;
 }
+
+/* Feed limit: the card after the last post. */
+#sift-caughtup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  text-align: center;
+  padding: 40px 24px 80px;
+  font: 14px -apple-system, system-ui, sans-serif;
+  color: #8e8e8e;
+}
+#sift-caughtup strong {
+  font-size: 17px;
+  color: inherit;
+  filter: brightness(1.4);
+}

@@ -246,6 +246,10 @@ enum Router {
             }
             return .allow
 
+        case "notifications":
+            // The heart icon's page on newer mobile web.
+            return f.igNotifications ? .allow : .redirect(instagramInbox)
+
         default:
             guard !instagramReserved.contains(first) else { return .allow }
             guard seg.count >= 2 else {
@@ -326,8 +330,18 @@ enum Router {
             return .allow
         }
         let p = segments(prev).map { $0.lowercased() }
-        guard let pFirst = p.first else { return .redirect(instagramInbox) }
+        // The story tray on the Following feed (home).
+        guard let pFirst = p.first else { return .allow }
         if pFirst == "direct" { return .allow }
+        // Highlights: open from a profile (or anywhere off a story), and move
+        // within the same highlight. Never from someone's story into one.
+        if owner == "highlights" {
+            if pFirst == "stories" {
+                return p.count >= 3 && p[1] == "highlights" && seg.count >= 3 && p[2] == seg[2].lowercased()
+                    ? .allow : .redirect(instagramInbox)
+            }
+            return .allow
+        }
         // Story ring on that person's profile.
         if pFirst == owner { return .allow }
         // Moving through one person's stories is fine. Auto-advancing to someone else is not.

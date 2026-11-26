@@ -47,6 +47,7 @@ struct SettingsView: View {
                 }
             }
 
+            presetsSection
             instagramSection
             youtubeSection
 
@@ -113,6 +114,32 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Quick setups
+
+    private var presetsSection: some View {
+        Section {
+            Button {
+                featureStore.features = featureStore.features.applyingInstagram(from: .everythingButReels)
+            } label: {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Instagram: everything but Reels")
+                        Text("Following feed that ends, posting, stories, profiles, search and notifications. No Reels, no Explore.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "sparkles")
+                }
+            }
+            .foregroundStyle(.primary)
+        } header: {
+            Text("Quick setups")
+        } footer: {
+            Text("Changes only the Instagram switches below. Back to strict resets everything.")
+        }
+    }
+
     // MARK: - Instagram
 
     private var instagramSection: some View {
@@ -124,6 +151,15 @@ struct SettingsView: View {
                 detail: clipDetail(featureStore.features.igReels, who: "people you follow")
             )
             SwitchRow("Feed", "square.grid.2x2", "Home, showing only people you follow. Adds a Feed tab.", f.igFeed)
+            if featureStore.features.igFeed {
+                SwitchRow("Stop when caught up", "checkmark.circle", "The feed ends at posts you have already seen, or older than 3 days.", f.igFeedCaughtUp)
+                Picker(selection: f.igFeedMax) {
+                    ForEach([10, 20, 30, 50, 100], id: \.self) { Text("\($0) posts").tag($0) }
+                    Text("No limit").tag(0)
+                } label: {
+                    Label("Posts per visit", systemImage: "number")
+                }
+            }
             SwitchRow("Posting", "plus.app", "Make posts. The Feed tab keeps Instagram's own Create button.", f.igPosting)
             SwitchRow("Profiles", "person.crop.circle", "Open people's profile pages.", f.igProfiles)
             SwitchRow("Stories", "circle.dashed", "One person's stories at a time, never on to someone else's.", f.igStories)

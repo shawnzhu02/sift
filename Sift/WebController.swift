@@ -206,8 +206,15 @@ final class WebStore: ObservableObject {
     }
 
     private func featuresChanged(from old: Features, to new: Features) {
-        // Rebuild every page's scripts and reload the ones already open.
-        controllers.values.forEach { $0.apply(features: new) }
+        // Rebuild every page's scripts, but reload only the pages whose flags
+        // changed (flipping a YouTube switch must not reload an open DM).
+        for (role, controller) in controllers {
+            if Site.flags(for: role, features: old) == Site.flags(for: role, features: new) {
+                controller.loadScripts(new)
+            } else {
+                controller.apply(features: new)
+            }
+        }
         if !visibleTabs.contains(tab) { tab = .settings }
         if new.clips(clipSite) == .off { clipSite = Self.defaultClipSite(new) }
     }

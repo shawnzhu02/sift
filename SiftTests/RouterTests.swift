@@ -93,6 +93,19 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(ig("https://www.instagram.com/stories/other/111/", prev: "https://www.instagram.com/friend/"), inbox)
     }
 
+    func testStoryFromFeedTrayAllowed() {
+        XCTAssertEqual(ig("https://www.instagram.com/stories/friend/111/", prev: "https://www.instagram.com/?variant=following"), .allow)
+        XCTAssertEqual(ig("https://www.instagram.com/stories/friend/111/", prev: "https://www.instagram.com/"), .allow)
+    }
+
+    func testHighlightsOpenFromProfileButNotFromStories() {
+        let hl = "https://www.instagram.com/stories/highlights/17900/"
+        XCTAssertEqual(ig(hl, prev: "https://www.instagram.com/friend/"), .allow)
+        XCTAssertEqual(ig(hl, prev: "https://www.instagram.com/stories/highlights/17900/"), .allow)
+        XCTAssertEqual(ig(hl, prev: "https://www.instagram.com/stories/friend/111/"), inbox)
+        XCTAssertEqual(ig("https://www.instagram.com/stories/highlights/17901/", prev: hl), inbox)
+    }
+
     // MARK: Cross-site and external links
 
     func testInstagramLinkShimUnwraps() {

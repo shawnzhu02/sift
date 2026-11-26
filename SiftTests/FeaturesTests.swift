@@ -112,6 +112,49 @@ final class FeaturesTests: XCTestCase {
         XCTAssertEqual(ig("https://www.instagram.com/accounts/activity/", .strict), .allow)
     }
 
+    func testFeedLimitFlagsAndDefaults() {
+        XCTAssertFalse(Features.strict.flags(for: .instagram).contains { $0.hasPrefix("feed-") })
+        let f = with { $0.igFeed = true; $0.igFeedMax = 20 }
+        XCTAssertTrue(f.flags(for: .instagram).contains("feed-caughtup"))
+        XCTAssertTrue(f.flags(for: .instagram).contains("feed-max-20"))
+        let none = with { $0.igFeed = true; $0.igFeedCaughtUp = false; $0.igFeedMax = 0 }
+        XCTAssertFalse(none.flags(for: .instagram).contains { $0.hasPrefix("feed-") })
+    }
+
+    func testOldSavedSettingsKeepFeedLimitDefaults() throws {
+        let old = Data(#"{"igFeed":true,"igPosting":true}"#.utf8)
+        let f = try JSONDecoder().decode(Features.self, from: old)
+        XCTAssertTrue(f.igFeed)
+        XCTAssertTrue(f.igFeedCaughtUp)
+        XCTAssertEqual(f.igFeedMax, 30)
+    }
+
+    func testEverythingButReelsPreset() {
+        let f = Features.everythingButReels
+        XCTAssertTrue(f.igFeed && f.igPosting && f.igStories && f.igProfiles && f.igSearch && f.igNotifications)
+        XCTAssertEqual(f.igReels, .off)
+        XCTAssertFalse(f.igExplore)
+        XCTAssertEqual(ig("https://www.instagram.com/", f), .redirect(Router.instagramFollowing))
+        XCTAssertEqual(ig("https://www.instagram.com/create/select/", f), .allow)
+        XCTAssertEqual(ig("https://www.instagram.com/reels/", f), inbox)
+        // Applying it leaves YouTube alone.
+        let mixed = with { $0.ytHome = true }.applyingInstagram(from: f)
+        XCTAssertTrue(mixed.ytHome)
+        XCTAssertTrue(mixed.igFeed)
+    }
+
+    func testOnlyChangedPagesReload() {
+        let before = Features.strict
+        let afterYT = with { $0.ytHome = true }
+        XCTAssertEqual(Site.flags(for: .messages, features: before), Site.flags(for: .messages, features: afterYT))
+        XCTAssertNotEqual(Site.flags(for: .subscriptions, features: before), Site.flags(for: .subscriptions, features: afterYT))
+    }
+
+    func testNotificationsPageFollowsSwitch() {
+        XCTAssertEqual(ig("https://www.instagram.com/notifications/", with { $0.igNotifications = false }), inbox)
+        XCTAssertEqual(ig("https://www.instagram.com/notifications/", .strict), .allow)
+    }
+
     func testReelsAll() {
         let f = with { $0.igReels = .all }
         XCTAssertEqual(ig("https://www.instagram.com/reels/", f), .allow)

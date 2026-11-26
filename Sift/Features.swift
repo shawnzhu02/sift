@@ -41,6 +41,10 @@ struct Features: Codable, Equatable {
     var igSearch = true
     /// The activity / notifications page.
     var igNotifications = true
+    /// With the feed on: it ends at posts you have already seen (or older than 3 days).
+    var igFeedCaughtUp = true
+    /// With the feed on: at most this many posts per visit. 0 = no limit.
+    var igFeedMax = 30
 
     // MARK: YouTube
 
@@ -58,6 +62,33 @@ struct Features: Codable, Equatable {
 
     static let strict = Features()
 
+    /// Normal Instagram minus Reels and Explore: the Following feed (which
+    /// ends), posting, stories, profiles, search and notifications.
+    static var everythingButReels: Features {
+        var f = Features()
+        f.igFeed = true
+        f.igPosting = true
+        f.igReels = .off
+        f.igExplore = false
+        return f
+    }
+
+    /// Instagram's own switches, leaving YouTube's as they are.
+    func applyingInstagram(from other: Features) -> Features {
+        var f = self
+        f.igFeed = other.igFeed
+        f.igReels = other.igReels
+        f.igStories = other.igStories
+        f.igProfiles = other.igProfiles
+        f.igPosting = other.igPosting
+        f.igExplore = other.igExplore
+        f.igSearch = other.igSearch
+        f.igNotifications = other.igNotifications
+        f.igFeedCaughtUp = other.igFeedCaughtUp
+        f.igFeedMax = other.igFeedMax
+        return f
+    }
+
     init() {}
 
     /// Missing keys (from an older version) keep their defaults.
@@ -72,6 +103,8 @@ struct Features: Codable, Equatable {
         igExplore = try c.decodeIfPresent(Bool.self, forKey: .igExplore) ?? d.igExplore
         igSearch = try c.decodeIfPresent(Bool.self, forKey: .igSearch) ?? d.igSearch
         igNotifications = try c.decodeIfPresent(Bool.self, forKey: .igNotifications) ?? d.igNotifications
+        igFeedCaughtUp = try c.decodeIfPresent(Bool.self, forKey: .igFeedCaughtUp) ?? d.igFeedCaughtUp
+        igFeedMax = try c.decodeIfPresent(Int.self, forKey: .igFeedMax) ?? d.igFeedMax
         ytShorts = (try? c.decodeIfPresent(ClipMode.self, forKey: .ytShorts)) ?? d.ytShorts
         ytHome = try c.decodeIfPresent(Bool.self, forKey: .ytHome) ?? d.ytHome
         ytSearch = try c.decodeIfPresent(Bool.self, forKey: .ytSearch) ?? d.ytSearch
@@ -98,6 +131,8 @@ struct Features: Codable, Equatable {
             if !igSearch { f.append("no-search") }
             if !igNotifications { f.append("no-notifications") }
             if !igFeed { f.append("no-feed") }
+            if igFeed && igFeedCaughtUp { f.append("feed-caughtup") }
+            if igFeed && igFeedMax > 0 { f.append("feed-max-\(igFeedMax)") }
         case .youtube:
             if ytShorts == .off { f.append("no-shorts") }
             if ytShorts == .following { f.append("clips-following") }
@@ -116,6 +151,12 @@ struct Features: Codable, Equatable {
         switch site {
         case .instagram:
             parts.append(igFeed ? "Home shows only people you follow." : "Home goes to your inbox.")
+            if igFeed {
+                var limit: [String] = []
+                if igFeedCaughtUp { limit.append("posts you have already seen") }
+                if igFeedMax > 0 { limit.append("\(igFeedMax) posts") }
+                if !limit.isEmpty { parts.append("The feed stops at " + limit.joined(separator: " or ") + ".") }
+            }
             if !igExplore { parts.append("Explore is off.") }
             switch igReels {
             case .off: parts.append("A reel opens only from a DM, one at a time.")
